@@ -97,7 +97,7 @@ if($ENV{'Data_HexDump_Range_USE_GIT_VERSION_FOR_DIST'})
 	
 	if($have_git)
 		{
-		print `git status -a`;
+		print `git status`;
 		
 		if($self->do_system('git log  --decorate > git_Changes'))
 			{
@@ -145,13 +145,15 @@ my $build = $class->new
 		{
 		'Readonly'         => 0,
 		'Sub::Exporter'     => 0,
-		#~ 'Getopt::Long' => 0,
+		'Getopt::Long' => 0,
+		'List::Util' => 0,
+		'List::MoreUtils' => 0,
 		},
 		
 	pm_files     => \%all_modules,
 	#~ autosplit    => \@split_modules,
 	
-	#~ script_files => 'scripts/script.pl',
+	script_files => 'scripts/hdr',
 	dist_author  => 'Nadim ibn hamouda el Khemir. <nkh@cpan.org>',
 	dist_abstract => 'Hexadecial Range Dumper',
 	);

@@ -18,7 +18,7 @@ use Sub::Exporter -setup =>
 	};
 	
 use vars qw ($VERSION);
-$VERSION     = '0.01_1';
+$VERSION     = '0.02_1';
 }
 
 #-------------------------------------------------------------------------------
@@ -128,7 +128,6 @@ followed by the binary data dump.
   data             00000066 00000010 65 74 75 70                                       etup
   footer           0000006a 00000000 20 3d 3e 20                                        =>
 
-
 =head3 Horizontal
 
 In this mode, the data are packed together in the dump
@@ -149,9 +148,9 @@ The default rendering corresponds to the following object construction:
   Data::HexDump::Range->new
 	(
 	FORMAT => 'ANSI',
-	COLOR => 'random',
+	COLOR => 'cycle',
 	
-	DISPLAY_ORIENTATION => 'horizontal',
+	ORIENTATION => 'horizontal',
 	
 	DISPLAY_RANGE_NAME => 1 ,
 	
@@ -200,7 +199,7 @@ The color definition is one of:
  
 =item * An RGB color definition - eg: todo: add example
 
-=item * undef - will be repaced by a white color or a random color (see B<COLOR> in L<new>).
+=item * undef - will be repaced by a white color or pickec from a cyclic color list (see B<COLOR> in L<new>).
 
 =back
 
@@ -256,7 +255,7 @@ Meta range names start witht the '<<' sequence.
 	    ['padding', 88, 'yellow']
 	    
 	      [
-	      '<< data', undef, # random color for the data meta range
+	      '<< data', undef, # undef => module picks a color for the data meta range
 	      
 	        ['data header', 5, 'blue on_yellow']
 		['data', 100, 'blue']
@@ -279,7 +278,7 @@ a subroutine definition.
 	[
 	  [\&name, \&size, \&color ],
 	
-	  \&define_range # returns a sub range definition
+	  [\&define_range] # returns a sub range definition
 	] ;
 
 =head4 'name' sub ref
@@ -354,12 +353,14 @@ Readonly my $NEW_ARGUMENTS =>
 	OFFSET_FORMAT 
 	DATA_WIDTH 
 	DISPLAY_OFFSET DISPLAY_CUMULATIVE_OFFSET
+	DISPLAY_ZERO_SIZE_RANGE_WARNING
+	DISPLAY_ZERO_SIZE_RANGE 
 	DISPLAY_RANGE_NAME
 	DISPLAY_ASCII_DUMP
 	DISPLAY_HEX_DUMP
 	DISPLAY_DEC_DUMP 
 	COLOR_NAMES 
-	DISPLAY_ORIENTATION 
+	ORIENTATION 
 	)] ;
 
 sub new
@@ -374,17 +375,19 @@ Create a Data::HexDump::Range object.
   my $hdr = Data::HexDump::Range->new
 		(
 		FORMAT => 'ANSI'|'ASCII'|'HTML',
-		COLOR => 'bw' | 'random',
+		COLOR => 'bw' | 'cycle',
 		OFFSET_FORMAT => 'hex' | 'dec',
 		DATA_WIDTH => 16 | 20 | ... ,
 		DISPLAY_RANGE_NAME => 1 ,
 		DISPLAY_OFFSET  => 1 ,
 		DISPLAY_CUMULATIVE_OFFSET  => 1 ,
+		DISPLAY_ZERO_SIZE_RANGE_WARNING => 1,
+		DISPLAY_ZERO_SIZE_RANGE => 1,
 		DISPLAY_ASCII_DUMP => 1 ,
 		DISPLAY_HEX_DUMP => 1,
 		DISPLAY_DEC_DUMP => 1,
 		COLOR_NAMES => {},
-		DISPLAY_ORIENTATION => 'horizontal',
+		ORIENTATION => 'horizontal',
 		) ;
 
 I<Arguments> - A list of named arguments
@@ -405,14 +408,14 @@ Useful if you use Data::HexDump::Range in an application without terminal.
 
 Default is B<ANSI> which allows for colors. Other formats are 'ASCII' and 'HTML'.
 
-=item * COLOR - String 'bw' or 'random'.
+=item * COLOR - String 'bw' or 'cycle'.
 
 Ranges for which no color has been defined, in 'ANSI' or 'HTML' format mode, will be rendered in
-black and white or with random colors according to this option. Default is 'bw'.
+black and white or with a color picked from a cyclic color list. Default is 'bw'.
 
 =item * OFFSET_FORMAT - String - 'hex' or 'dec'
 
-if set to 'hex', the offset will be displayed in base 16. When set to 'dec' the offset is displayed
+If set to 'hex', the offset will be displayed in base 16. When set to 'dec' the offset is displayed
 in base 10. Default is 'hex'.
 
 =item * DATA_WIDTH - Integer - Number of elements displayed per line. Default is 16.
@@ -422,6 +425,10 @@ in base 10. Default is 'hex'.
 =item * DISPLAY_OFFSET - Boolean - If set, the offset columnis displayed in the dump.
 
 =item * DISPLAY_CUMULATIVE_OFFSET - Boolean - If set, the cumulative offset column is displayed in 'vertical' rendering mode
+
+=item * DISPLAY_ZERO_SIZE_RANGE - Boolean - if set, ranges that do not consume data are displayed. default is I<true> 
+
+=item * DISPLAY_ZERO_SIZE_RANGE_WARNING - Boolean - if set, a warning is emitted if ranges that do not consume data. default is I<true> 
 
 =item * DISPLAY_ASCII_DUMP - Boolean - If set, the ASCII representation of the binary data is displayed
 
@@ -446,7 +453,7 @@ in base 10. Default is 'hex'.
   }
 
 
-=item * DISPLAY_ORIENTATION - String - 'vertical' or 'horizontal' (the default).
+=item * ORIENTATION - String - 'vertical' or 'horizontal' (the default).
 
 =back
 
@@ -491,7 +498,7 @@ if (@setup_data % 2)
 
 $self->{INTERACTION}{INFO} ||= sub {print @_} ;
 $self->{INTERACTION}{WARN} ||= \&Carp::carp ;
-$self->{INTERACTION}{DIE}  ||= \&Carp::confess ;
+$self->{INTERACTION}{DIE}  ||= \&Carp::croak ;
 $self->{NAME} = 'Anonymous';
 $self->{FILE} = $file_name ;
 $self->{LINE} = $line ;
@@ -506,9 +513,19 @@ $self->CheckOptionNames($NEW_ARGUMENTS, @setup_data) ;
 
 	FORMAT => 'ANSI',
 	COLOR => 'bw',
+	COLORS =>
+		{
+		ASCII => [],
+		ANSI => ['white', 'green'],
+		HTML => ['?', '?'],
+		},
+		
 	OFFSET_FORMAT => 'hex',
 	DATA_WIDTH => 16,
-
+	
+	DISPLAY_ZERO_SIZE_RANGE_WARNING => 1,
+	DISPLAY_ZERO_SIZE_RANGE => 1,
+	
 	DISPLAY_RANGE_NAME => 1,
 	DISPLAY_OFFSET => 1,
 	DISPLAY_CUMULATIVE_OFFSET => 1,
@@ -516,9 +533,9 @@ $self->CheckOptionNames($NEW_ARGUMENTS, @setup_data) ;
 	DISPLAY_DEC_DUMP => 0,
 	DISPLAY_ASCII_DUMP => 1,
 	
-	COLOR_NAMES => {},
+	COLOR_NAMES => undef,
 
-	DISPLAY_ORIENTATION => 'horizontal',
+	ORIENTATION => 'horizontal',
 	
 	GATHERED => [],
 	@setup_data,
@@ -531,7 +548,9 @@ if($self->{VERBOSE})
 	$self->{INTERACTION}{INFO}('Creating ' . ref($self) . " '$self->{NAME}' at $location.\n") ;
 	}
 
-$self->{OFFSET_FORMAT} = $self->{OFFSET_FORMAT} eq 'hex' ? "%08x" : "%010d" ;
+$self->{OFFSET_FORMAT} = $self->{OFFSET_FORMAT} =~ /^hex/ ? "%08x" : "%010d" ;
+
+#todo: check all the options values
 
 return(1) ;
 }
@@ -823,20 +842,27 @@ I<Exceptions> dies if passed invalid parameters
 
 my ($self, $collected_data, $range_description, $data, $offset, $size) = @_ ;
 
-my $ranges = create_ranges($range_description) ;
+my $ranges = $self->create_ranges($range_description) ;
 
 my $used_data = $offset || 0 ;
-
-#~ use Data::TreeDumper ;
-#~ print DumpTree $range_description ;
-#~ print DumpTree $ranges ;
 
 my $skip_ranges = 0 ;
 
 for my $range (@{$ranges})
 	{
-	my ($range_name, $range_size, $range_color) = @{$range} ;
+	my ($name, $size, $color) = @{$range} ;
 	
+	my @sub_or_scalar ;
+	
+	push @sub_or_scalar, ref($name) eq 'CODE' ? $name->()  : $name ;
+	push @sub_or_scalar, ref($size) eq 'CODE' ? $size->()  : $size ;
+	push @sub_or_scalar, ref($color) eq 'CODE' ? $color->()  : $color;
+	
+	my ($range_name, $range_size, $range_color) = @sub_or_scalar ;
+	
+	$self->{INTERACTION}{WARN}("Warning: range '$range_name' requires zero bytes.\n")
+		if($range_size == 0 && $self->{DISPLAY_ZERO_SIZE_RANGE_WARNING}) ;
+		
 	if($used_data + $range_size > length $data)
 		{
 		my $available = length($data) - $used_data ;
@@ -858,7 +884,6 @@ for my $range (@{$ranges})
 	$used_data += $range_size ;
 	last if $skip_ranges ;
 	}
-
 
 return $collected_data, $used_data ;
 }
@@ -886,9 +911,9 @@ I<Exceptions> - Croaks with an error messge if the input data is invalid
 
 =cut
 
-my ($range_description) = @_ ;
+my ($self, $range_description) = @_ ;
 
-my @flattened = flatten($range_description) ;
+my @flattened = $self->flatten($range_description) ;
 
 my @ranges ;
 
@@ -923,11 +948,57 @@ I<Exceptions> - Croaks with an error messge if the input data is invalid
 
 =cut
 
+use List::MoreUtils qw(all) ;
+
+my $self = shift ;
+
 map 
 	{
-	(ref($_) eq 'ARRAY')
-		? flatten(@$_ )
-		: $_
+	my  $description = $_ ;
+	
+	if(ref($description) eq 'ARRAY')
+		{
+		if(all {'' eq ref($_) || 'CODE' eq ref($_) } @{$description} ) # todo: handle code refs
+			{			
+			# a simple  range description, color is  optional
+			if(@{$description} == 0)
+				{
+				$self->{INTERACTION}{DIE}->("Error: too few elements in range description [" . join(', ', map {defined $_ ? $_ : 'undef'} @{$description})  . "]." ) ;
+				}
+			elsif(@{$description} == 1)
+				{
+				if('' eq ref($description->[0]))
+					{
+					$self->{INTERACTION}{DIE}->("Error: too few elements in range description [" . join(', ', map {defined $_ ? $_ : 'undef'} @{$description})  . "]." ) ;
+					}
+				else
+					{
+					@{$description} = $description->[0]() ;
+					
+					$self->{INTERACTION}{DIE}->("Error: single sub range definition returned [" . join(', ', map {defined $_ ? $_ : 'undef'}@{$description})  . "]." ) 
+						unless (@{$description} == 3) ;
+					}
+				}
+			elsif(@{$description}  == 2)
+				{
+				push @{$description}, undef ;
+				}
+			elsif(@{$description} > 3)
+				{
+				$self->{INTERACTION}{DIE}->("Error: too many elements in range description [" . join(', ', map {defined $_ ? $_ : 'undef'} @{$description}) . "]." ) ;
+				}
+				
+			@{$description} ;
+			}
+		else
+			{
+			$self->flatten(@{$description}) ;
+			}
+		}
+	else
+		{
+		$description
+		}
 	} @_ 
 }
 
@@ -966,10 +1037,23 @@ my $total_dumped_data = 0 ;
 
 for my $data (@{$collected_data})
 	{
-	if($self->{DISPLAY_ORIENTATION} eq 'horizontal')
+	if($self->{ORIENTATION} =~ /^hor/)
 		{
 		my $last_data = $data == $collected_data->[-1] ? 1 : 0 ;
 		my $dumped_data = 0 ;
+		
+		if(0 == length($data->{DATA}) && $self->{DISPLAY_ZERO_SIZE_RANGE})
+			{
+			push @{$line->{RANGE_NAME}},
+				{
+				'RANGE_NAME_COLOR' => $data->{COLOR},
+				'RANGE_NAME' => "<$data->{NAME}>",
+				},
+				{
+				'RANGE_NAME_COLOR' => undef,
+				'RANGE_NAME' => ', ',
+				} ;
+			}
 		
 		while ($dumped_data < length($data->{DATA}))
 			{
@@ -1025,6 +1109,19 @@ for my $data (@{$collected_data})
 		my $dumped_data = 0 ;
 		my $current_range = '' ;
 		
+		if(0 == length($data->{DATA}) && $self->{DISPLAY_ZERO_SIZE_RANGE})
+			{
+			push @{$line->{RANGE_NAME}},
+				{
+				'RANGE_NAME_COLOR' => $data->{COLOR},
+				'RANGE_NAME' => "<$data->{NAME}>",
+				} ;
+				
+			$line->{NEW_LINE} ++ ;
+			push @lines, $line ;
+			$line = {};
+			}
+			
 		while ($dumped_data < length($data->{DATA}))
 			{
 			my $size_to_dump = min($self->{DATA_WIDTH}, length($data->{DATA}) - $dumped_data) ;
@@ -1068,6 +1165,29 @@ return \@lines ;
 
 #-------------------------------------------------------------------------------
 
+my $current_color_index = 0 ;
+
+sub get_default_color
+{
+my ($self) = @_ ;
+
+my $default_color ;
+
+if($self->{COLOR} eq 'bw')
+	{
+	$default_color = $self->{COLORS}{$self->{FORMAT}}[0] ;
+	}
+else
+	{
+	$current_color_index++ ;
+	$current_color_index = 0 if $current_color_index >= @{$self->{COLORS}{$self->{FORMAT}}} ;
+	
+	$default_color = $self->{COLORS}{$self->{FORMAT}}[$current_color_index] ;
+	}
+	
+return $default_color ;
+}
+
 sub format
 {
 	
@@ -1103,19 +1223,25 @@ for ($self->{FORMAT})
 		my $colorizer = /ASCII/ ? sub {$_[0]} : \&colored ;
 		
 		my @fields = 
-			$self->{DISPLAY_ORIENTATION} eq 'horizontal'
+			$self->{ORIENTATION} =~ /^hor/
 				? qw(OFFSET HEX_DUMP DEC_DUMP ASCII_DUMP RANGE_NAME)
 				: qw( RANGE_NAME OFFSET CUMULATIVE_OFFSET HEX_DUMP DEC_DUMP ASCII_DUMP) ;
 
 		for my $line (@{$line_data})
 			{
+			my $default_color = $self->get_default_color() ;
+			
 			for my $field (@fields)
 				{
 				if(exists $line->{$field})
 					{
 					for my $range (@{$line->{$field}})
 						{
-						$formated .= $colorizer->($range->{$field}, $range->{"${field}_COLOR"} || 'white') ;
+						my $user_color = defined $self->{COLOR_NAMES} &&  defined $range->{"${field}_COLOR"}
+										? $self->{COLOR_NAMES} {$self->{FORMAT}}{$range->{"${field}_COLOR"}}  ||  $range->{"${field}_COLOR"}
+										: $range->{"${field}_COLOR"} ;
+						
+						$formated .= $colorizer->($range->{$field}, $user_color || $default_color) ;
 						}
 					}
 					
