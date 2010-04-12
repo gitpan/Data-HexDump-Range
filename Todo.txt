@@ -2,5 +2,37 @@
 # This is Todo.txt #
 #------------------#
 
-screen cast or images on web site
+html file, that is the web site, in the distribution
+	pod with embedded HTML dumps
+	embed the html in the module directly
+
+option to not show comments
+
+in direct dump mode, use the offset passed by the user to set the starting offset point
+	000017 xx xx xx xx                    something starting at offset 17
+
+if single item range is sub and the returned data is an array ref, expand the ref
+
+iterator class => parser
+	sub my_parser 
+		{
+		my ($data, $offset) = @_ ;
+
+		$offset > length($data)
+			? unpack ("x$offset C", $data) 
+				? ['from odd', 5, 'blue']
+				: ['from even' 3, 'green'] ;
+			: undef
+		}
+
+	my $data = '01' x 50 ;
+	my $hdr = ...
+
+	print $hdr->dump(\&my_parser, $data) ;
+
+pack format
+	can we get the size of the data defined by pack?
+	use Scalar::Util qw(looks_like_number);
+
+Test::Hexdump::Range
 

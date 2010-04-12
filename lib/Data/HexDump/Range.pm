@@ -18,7 +18,7 @@ use Sub::Exporter -setup =>
 	};
 	
 use vars qw ($VERSION);
-$VERSION     = '0.02_1';
+$VERSION     = '0.03';
 }
 
 #-------------------------------------------------------------------------------
@@ -32,7 +32,9 @@ use Carp qw(carp croak confess) ;
 
 #use Graphics::ColorNames
 use List::Util qw(min) ;
- 
+use List::MoreUtils qw(all) ;
+use Scalar::Util qw(looks_like_number) ;
+
 #-------------------------------------------------------------------------------
 
 =head1 NAME
@@ -52,13 +54,6 @@ Data::HexDump::Range - Hexadecial Range Dumper
   print $hdr->dump_gathered() ;
   
   $hdr->reset() ;
-
-=head1 HEADS UP!
-
-This is the first release . The API is unlikely to change but you never know. 
-The documentation shows more what I want the module to do than what is implemented.
-
-Still, this is module as well as the I<hdr> script are functional enough to be useful.
 
 =head1 DESCRIPTION
 
@@ -102,9 +97,10 @@ The examples below show the hypothetic ranges:
 		
 	  [
 	    ['extra data', 12, undef],
-	      [
-	      $data_range, 
-	      ['footer', 4, 'bright_yellow on_red'],
+	    
+	    [
+	    $data_range, 
+	    ['footer', 4, 'bright_yellow on_red'],
 	    ]
 	  ],
 	] ;
@@ -233,41 +229,29 @@ For simple data formats, your can put all the your range descriptions in a array
 		
 	  [
 	    ['extra data', 12, undef],
-	      [
+	    [
 	      $data_range, 
 	      ['footer', 4, 'yellow on_red'],
 	    ]
 	  ],
 	]
 	
-=head4 Meta Ranges
+=head4 Comment ranges
 
-Meta Ranges are defined by their sub ranges. They do not consume any data but describe their contants
+If the size of a range is the string '#', the whole range is considered a comment
 
-Meta range names start witht the '<<' sequence.
-
-  my $meta_range_defintion = 
+  my $range_defintion_with_comments = 
 	[
-	  [
-	  '<< header and data meta range', 'color for meta range'
-	  
-	    ['magic cookie', 12, 'red']
-	    ['padding', 88, 'yellow']
+	  ['comment text', '#', 'optional color for meta range'],
+	  ['magic cookie', 12, 'red'],
+	  ['padding', 88, 'yellow'],
 	    
-	      [
-	      '<< data', undef, # undef => module picks a color for the data meta range
-	      
-	        ['data header', 5, 'blue on_yellow']
-		['data', 100, 'blue']
-	      ]
+	  [
+	    ['another comment', '#'],
+	    ['data header', 5, 'blue on_yellow'],
+	    ['data', 100, 'blue'],
 	  ],
 	] ;
-
-todo: add horizontal example
-
-=head3 Keeping range definitions in external files
-
-todo: add example
 
 =head3 Dynamic range definition
 
@@ -277,7 +261,6 @@ a subroutine definition.
   my $dynamic_range =
 	[
 	  [\&name, \&size, \&color ],
-	
 	  [\&define_range] # returns a sub range definition
 	] ;
 
@@ -285,10 +268,8 @@ a subroutine definition.
 
   sub cloth_size
   {
-  my $data = shift ; #parsed data
-  
+  my ($data, $offset, $size) = @_ ;
   my %types = (O => 'S', 1 => 'M', 2 => 'L',) ;
-  
   return 'size:' . ($types{$data} // '?') ;
   }
   
@@ -298,7 +279,7 @@ a subroutine definition.
 
   sub cloth_size
   {
-  my $data = shift ; #remaining data
+  my ($data, $offset, $size) = @_ ;
   return unpack "a", $data ;
   }
   
@@ -311,26 +292,19 @@ a subroutine definition.
   
   sub alternate_color {$flip_flop ^= 1 ; return $colors[$flip_flop] }
   
-  $hdr->dump
-	(
-	[
-	  ['data', 100, \&alternate_color],
-	  ['other_data', 100, \&alternate_color],
-	]
-	$data
-	) ;
+  $hdr->dump(['data', 100, \&alternate_color], $data) ;
 
-=head4 whole range definition as a subroutine reference
+=head4 Range definition defined by a subroutine reference
 
-This allows you to define a parser. 
-
-TODO: give an example
-
-TODO: give an alternative solution using L<gather>
+  my $hdr = Data::HexDump::Range->new() ;
+  
+  print $hdr->dump(\&parser, $data) ;
 
 =head1 OTHER IDEAS
 
 - allow pack format as range size
+	pack in array context returns the amount of fields processed
+	fixed format can be found with a length of unpack
 
 - hook with Convert::Binary::C to automatically create ranges
 
@@ -356,6 +330,7 @@ Readonly my $NEW_ARGUMENTS =>
 	DISPLAY_ZERO_SIZE_RANGE_WARNING
 	DISPLAY_ZERO_SIZE_RANGE 
 	DISPLAY_RANGE_NAME
+	MAXIMUM_RANGE_NAME_SIZE
 	DISPLAY_ASCII_DUMP
 	DISPLAY_HEX_DUMP
 	DISPLAY_DEC_DUMP 
@@ -379,6 +354,7 @@ Create a Data::HexDump::Range object.
 		OFFSET_FORMAT => 'hex' | 'dec',
 		DATA_WIDTH => 16 | 20 | ... ,
 		DISPLAY_RANGE_NAME => 1 ,
+		MAXIMUM_RANGE_NAME_SIZE => 16,
 		DISPLAY_OFFSET  => 1 ,
 		DISPLAY_CUMULATIVE_OFFSET  => 1 ,
 		DISPLAY_ZERO_SIZE_RANGE_WARNING => 1,
@@ -421,6 +397,10 @@ in base 10. Default is 'hex'.
 =item * DATA_WIDTH - Integer - Number of elements displayed per line. Default is 16.
 
 =item * DISPLAY_RANGE_NAME - Boolean - If set, range names are displayed in the dump.
+
+=item * MAXIMUM_RANGE_NAME_SIZE - Integer - maximum size of a range name (in horizontal mode)
+
+Default size is 16.
 
 =item * DISPLAY_OFFSET - Boolean - If set, the offset columnis displayed in the dump.
 
@@ -527,6 +507,7 @@ $self->CheckOptionNames($NEW_ARGUMENTS, @setup_data) ;
 	DISPLAY_ZERO_SIZE_RANGE => 1,
 	
 	DISPLAY_RANGE_NAME => 1,
+	MAXIMUM_RANGE_NAME_SIZE => 16,
 	DISPLAY_OFFSET => 1,
 	DISPLAY_CUMULATIVE_OFFSET => 1,
 	DISPLAY_HEX_DUMP => 1,
@@ -549,6 +530,7 @@ if($self->{VERBOSE})
 	}
 
 $self->{OFFSET_FORMAT} = $self->{OFFSET_FORMAT} =~ /^hex/ ? "%08x" : "%010d" ;
+$self->{MAXIMUM_RANGE_NAME_SIZE} = 2 if$self->{MAXIMUM_RANGE_NAME_SIZE} <= 2 ;
 
 #todo: check all the options values
 
@@ -650,6 +632,8 @@ I<Arguments>
 
 =back
 
+=back
+
 I<Returns> - An integer - the number of processed bytes
 
 I<Exceptions> - See L<_gather>
@@ -702,29 +686,7 @@ Dump the data, up to $size, according to the description
 
 I<Arguments> - See L<gather>
 
-I<Returns> - 
-
-=over 2
-
-=item * Scalar context
-
-=over 2
-
-=item * A string -  the formated dump
-
-=back 
-
-=item * List context
-
-=over 2
-
-=item *  A string -  the formated dump
-
-=item * An integer - the number of bytes consumed by the range specification
-
-=back 
-
-=back 
+I<Returns> - A string -  the formated dump
 
 I<Exceptions> - dies if the range description is invalid
 
@@ -804,7 +766,7 @@ return ;
 sub _gather
 {
 
-=head2 [P] _gather($range_description, $data, $size)
+=head2 [P] _gather($range_description, $data, $offset, $size)
 
 Creates an internal data structure from the data to dump.
 
@@ -846,42 +808,76 @@ my $ranges = $self->create_ranges($range_description) ;
 
 my $used_data = $offset || 0 ;
 
+if($used_data < 0)
+	{
+	my $location = "$self->{FILE}:$self->{LINE}" ;
+	$self->{INTERACTION}{DIE}("Warning: Invalid negative offset at '$location'.\n")
+	}
+
+$size = defined $size ? min($size, length($data) - $used_data) : length($data) - $used_data ;
+
+my $location = "$self->{FILE}:$self->{LINE}" ;
 my $skip_ranges = 0 ;
 
 for my $range (@{$ranges})
 	{
-	my ($name, $size, $color) = @{$range} ;
+	my ($range_name, $range_size, $range_color) = @{$range} ;
+	my $is_comment = 0 ;
 	
+	if('' eq ref($range_size))
+		{
+		if('#' eq  $range_size)
+			{
+			$is_comment++ ;
+			}
+		elsif(looks_like_number($range_size))
+			{
+			# OK
+			}
+		else
+			{
+			$self->{INTERACTION}{DIE}("Error: size '$range_size' doesn't look like a number in range '$range_name' at '$location'.\n")
+			}
+		}
+		
 	my @sub_or_scalar ;
 	
-	push @sub_or_scalar, ref($name) eq 'CODE' ? $name->()  : $name ;
-	push @sub_or_scalar, ref($size) eq 'CODE' ? $size->()  : $size ;
-	push @sub_or_scalar, ref($color) eq 'CODE' ? $color->()  : $color;
+	push @sub_or_scalar, ref($range_name) eq 'CODE' ? $range_name->($data, $used_data, $size)  : $range_name ;
+	push @sub_or_scalar, ref($range_size) eq 'CODE' ? $range_size->($data, $used_data, $size)  : $range_size ;
+	push @sub_or_scalar, ref($range_color) eq 'CODE' ? $range_color->($data, $used_data, $size)  : $range_color;
 	
-	my ($range_name, $range_size, $range_color) = @sub_or_scalar ;
+	($range_name, $range_size, $range_color) = @sub_or_scalar ;
 	
 	$self->{INTERACTION}{WARN}("Warning: range '$range_name' requires zero bytes.\n")
-		if($range_size == 0 && $self->{DISPLAY_ZERO_SIZE_RANGE_WARNING}) ;
+		if(!$is_comment && $range_size == 0 && $self->{DISPLAY_ZERO_SIZE_RANGE_WARNING}) ;
 		
-	if($used_data + $range_size > length $data)
+	if(!$is_comment && $range_size > $size)
 		{
-		my $available = length($data) - $used_data ;
 		my $location = "$self->{FILE}:$self->{LINE}" ;
-		$self->{INTERACTION}{WARN}("Warning: not enough data for range '$range_name', $range_size needed but only $available available.\n") ;
+		$self->{INTERACTION}{WARN}("Warning: not enough data for range '$range_name', $range_size needed but only $size available.\n") ;
 		
-		$range_size = $available ;
+		$range_name = '-' . ($range_size - $size)  . ':' . $range_name ;
+		
+		$range_size = $size;
 		$skip_ranges++ ;
 		}
 			
+	my $unpack_format 
+		= $is_comment
+			? '#' 
+			: "x$used_data a$range_size"  ;
+	
 	push @{$collected_data}, 		
 		{
 		NAME => $range_name, 
 		COLOR => $range_color,
 		OFFSET => $used_data,
-		DATA => unpack("x$used_data a$range_size", $data)
+		DATA => $is_comment ? undef : unpack($unpack_format, $data)
 		} ;
 	
-	$used_data += $range_size ;
+	$used_data += $range_size unless $is_comment ;
+	$size -= $range_size unless $is_comment ;
+	
 	last if $skip_ranges ;
 	}
 
@@ -902,6 +898,79 @@ I<Arguments> -
 =over 2 
 
 =item * $range_description - See L<gather> 
+
+=back
+
+I<Returns> - Nothing
+
+I<Exceptions> - Croaks with an error messge if the input data is invalid
+
+=cut
+
+my ($self, $range_description) = @_ ;
+
+return $self->create_ranges_from_array_ref($range_description) if 'ARRAY' eq ref($range_description) ;
+return $self->create_ranges_from_string($range_description) if '' eq ref($range_description) ;
+
+}
+
+#-------------------------------------------------------------------------------
+
+sub create_ranges_from_string
+{
+
+=head2 [P] create_ranges_from_string($range_description)
+
+transforms the user supplied ranges into an internal format
+
+I<Arguments> - 
+
+=over 2 
+
+=item * $range_description - A string - See L<gather> 
+
+=back
+
+I<Returns> - Nothing
+
+I<Exceptions> - Croaks with an error messge if the input data is invalid
+
+=cut
+
+my ($self, $range_description) = @_ ;
+
+# 'comment,#:name,size,color:name,size:name,size,color'
+
+my @ranges = 
+	map
+	{
+		[ map {s/^\s+// ; s/\s+$//; $_} split /,/ ] ;
+	} split /:/, $range_description ;
+
+my @flattened = $self->flatten(\@ranges) ;
+@ranges = () ;
+
+while(@flattened)
+	{
+	push @ranges, [splice(@flattened, 0, 3)] ;
+	}
+
+return \@ranges ;
+}
+
+
+sub create_ranges_from_array_ref
+{
+
+=head2 [P] create_ranges_from_array_ref($range_description)
+
+transforms the user supplied ranges into an internal format
+
+I<Arguments> - 
+
+=over 2 
+
+=item * $range_description - An array reference - See L<gather> 
 
 =back
 
@@ -948,8 +1017,6 @@ I<Exceptions> - Croaks with an error messge if the input data is invalid
 
 =cut
 
-use List::MoreUtils qw(all) ;
-
 my $self = shift ;
 
 map 
@@ -959,23 +1026,40 @@ map
 	if(ref($description) eq 'ARRAY')
 		{
 		if(all {'' eq ref($_) || 'CODE' eq ref($_) } @{$description} ) # todo: handle code refs
-			{			
+			{
+			my $location = "$self->{FILE}:$self->{LINE}" ;
+			
 			# a simple  range description, color is  optional
 			if(@{$description} == 0)
 				{
-				$self->{INTERACTION}{DIE}->("Error: too few elements in range description [" . join(', ', map {defined $_ ? $_ : 'undef'} @{$description})  . "]." ) ;
+				$self->{INTERACTION}{DIE}->
+					(
+					"Error: too few elements in range description [" 
+					. join(', ', map {defined $_ ? $_ : 'undef'} @{$description})  
+					. "] at '$location'." 
+					) ;
 				}
 			elsif(@{$description} == 1)
 				{
 				if('' eq ref($description->[0]))
 					{
-					$self->{INTERACTION}{DIE}->("Error: too few elements in range description [" . join(', ', map {defined $_ ? $_ : 'undef'} @{$description})  . "]." ) ;
+				$self->{INTERACTION}{DIE}->
+					(
+					"Error: too few elements in range description [" 
+					. join(', ', map {defined $_ ? $_ : 'undef'} @{$description})  
+					. "] at '$location'." 
+					) ;
 					}
 				else
 					{
 					@{$description} = $description->[0]() ;
 					
-					$self->{INTERACTION}{DIE}->("Error: single sub range definition returned [" . join(', ', map {defined $_ ? $_ : 'undef'}@{$description})  . "]." ) 
+					$self->{INTERACTION}{DIE}->
+						(
+						"Error: single sub range definition returned ["
+						. join(', ', map {defined $_ ? $_ : 'undef'}@{$description})  
+						. "] at '$location'." 
+						) 
 						unless (@{$description} == 3) ;
 					}
 				}
@@ -985,7 +1069,12 @@ map
 				}
 			elsif(@{$description} > 3)
 				{
-				$self->{INTERACTION}{DIE}->("Error: too many elements in range description [" . join(', ', map {defined $_ ? $_ : 'undef'} @{$description}) . "]." ) ;
+				$self->{INTERACTION}{DIE}->
+					(
+					"Error: too many elements in range description [" 
+					. join(', ', map {defined $_ ? $_ : 'undef'} @{$description}) 
+					. "] at '$location'." 
+					) ;
 				}
 				
 			@{$description} ;
@@ -1006,6 +1095,7 @@ map
 
 sub split
 {
+
 =head2 [P] split($collected_data)
 
 Split the collected data into lines
@@ -1034,20 +1124,29 @@ my $line = {} ;
 
 my $room_left = $self->{DATA_WIDTH} ;
 my $total_dumped_data = 0 ;
+my $name_size = $self->{MAXIMUM_RANGE_NAME_SIZE} ;
 
 for my $data (@{$collected_data})
 	{
+	my $data_length = defined $data->{DATA} ? length($data->{DATA}) : 0 ;
+	my $is_comment = ! defined $data->{DATA} ;
+	my ($start_quote, $end_quote) = $is_comment ? ('"', '"') : ('<', '>') ;
+	
 	if($self->{ORIENTATION} =~ /^hor/)
 		{
 		my $last_data = $data == $collected_data->[-1] ? 1 : 0 ;
 		my $dumped_data = 0 ;
+		my $data_length = defined $data->{DATA} ? length($data->{DATA}) : 0 ;
 		
-		if(0 == length($data->{DATA}) && $self->{DISPLAY_ZERO_SIZE_RANGE})
+		if(0 == $data_length && $self->{DISPLAY_ZERO_SIZE_RANGE})
 			{
+			my $name_size_quoted = $name_size - 2 ;
+			$name_size_quoted =  2 if $name_size_quoted < 2 ;
+			
 			push @{$line->{RANGE_NAME}},
 				{
 				'RANGE_NAME_COLOR' => $data->{COLOR},
-				'RANGE_NAME' => "<$data->{NAME}>",
+				'RANGE_NAME' => $start_quote . sprintf("%.${name_size_quoted}s", $data->{NAME}) . $end_quote,
 				},
 				{
 				'RANGE_NAME_COLOR' => undef,
@@ -1055,7 +1154,7 @@ for my $data (@{$collected_data})
 				} ;
 			}
 		
-		while ($dumped_data < length($data->{DATA}))
+		while ($dumped_data < $data_length)
 			{
 			my $size_to_dump = min($room_left, length($data->{DATA}) - $dumped_data) ;
 			$room_left -= $size_to_dump ;
@@ -1066,7 +1165,7 @@ for my $data (@{$collected_data})
 				['HEX_DUMP', sub {sprintf '%02x ' x $size_to_dump, @_}, $data->{COLOR}, 3],
 				['DEC_DUMP', sub {sprintf '%03u ' x $size_to_dump, @_}, $data->{COLOR}, 4],
 				['ASCII_DUMP', sub {sprintf '%c' x $size_to_dump, map{$_ < 30 ? ord('.') : $_ } @_}, $data->{COLOR}, 1],
-				['RANGE_NAME', sub {$data->{NAME} }, $data->{COLOR}],
+				['RANGE_NAME',sub {sprintf "%.${name_size}s", $data->{NAME} ; }, $data->{COLOR}],
 				['RANGE_NAME', sub {', '}],
 				)
 				{
@@ -1109,12 +1208,12 @@ for my $data (@{$collected_data})
 		my $dumped_data = 0 ;
 		my $current_range = '' ;
 		
-		if(0 == length($data->{DATA}) && $self->{DISPLAY_ZERO_SIZE_RANGE})
+		if(0 == $data_length && $self->{DISPLAY_ZERO_SIZE_RANGE})
 			{
 			push @{$line->{RANGE_NAME}},
 				{
 				'RANGE_NAME_COLOR' => $data->{COLOR},
-				'RANGE_NAME' => "<$data->{NAME}>",
+				'RANGE_NAME' => "$start_quote$data->{NAME}$end_quote",
 				} ;
 				
 			$line->{NEW_LINE} ++ ;
@@ -1122,13 +1221,13 @@ for my $data (@{$collected_data})
 			$line = {};
 			}
 			
-		while ($dumped_data < length($data->{DATA}))
+		while ($dumped_data < $data_length)
 			{
 			my $size_to_dump = min($self->{DATA_WIDTH}, length($data->{DATA}) - $dumped_data) ;
 			
 			for my  $field_type 
 				(
-				['RANGE_NAME',  sub {sprintf "%-16s", $data->{NAME} ; }, $data->{COLOR}] ,
+				['RANGE_NAME',  sub {sprintf "%-${name_size}.${name_size}s", $data->{NAME} ; }, $data->{COLOR}] ,
 				['OFFSET', sub {sprintf $self->{OFFSET_FORMAT}, $total_dumped_data ;}, undef],
 				['CUMULATIVE_OFFSET', sub {sprintf $self->{OFFSET_FORMAT}, $dumped_data}, undef],
 				['HEX_DUMP', sub {sprintf '%02x ' x $size_to_dump, @_}, $data->{COLOR}, 3],
@@ -1169,6 +1268,21 @@ my $current_color_index = 0 ;
 
 sub get_default_color
 {
+
+=head2 [P] get_default_color()
+
+Returns a color to use with a range that has none
+
+  my $default_color = $self->get_default_color() ;
+
+I<Arguments> - None
+
+I<Returns> - A string - a color according to the COLOR option and FORMAT
+
+I<Exceptions> - None
+
+=cut
+
 my ($self) = @_ ;
 
 my $default_color ;

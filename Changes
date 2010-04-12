@@ -1,4 +1,34 @@
-commit e214889a7639fbbd8e06b0835afd480d58c48a14 (HEAD, master)
+commit 1b21732ac6889135f062749561a5240aa5ce6b4a (HEAD, master)
+Author: nadim khemir <nkh@cpan.org>
+Date:   Tue Apr 13 01:15:09 2010 +0200
+
+    ADDED: comment ranges
+
+commit 6c5dc1bfc3611ccc11e1583a807062f7deecdf46
+Author: nadim khemir <nkh@cpan.org>
+Date:   Mon Apr 12 23:01:19 2010 +0200
+
+    ADDED: accept input from stdin
+
+commit 7c1ff07a51460813cb15b45c025270264cac1c51
+Author: nadim khemir <nkh@cpan.org>
+Date:   Mon Apr 12 22:22:57 2010 +0200
+
+    CHANGED: display about missing data in range name (ie: -16:padding)
+
+commit c2581c6a6dab982d5ba4383cbfe93960a5eab9ed
+Author: nadim khemir <nkh@cpan.org>
+Date:   Mon Apr 12 21:57:20 2010 +0200
+
+    ADDED: MAXIMUM_RANGE_NAME_SIZE
+
+commit bc3646a2d31ea880d1d1eeb81160b96eebb25c86
+Author: nadim khemir <nkh@cpan.org>
+Date:   Mon Apr 12 20:26:40 2010 +0200
+
+    ADDED: accept string range description
+
+commit e214889a7639fbbd8e06b0835afd480d58c48a14
 Author: nadim khemir <nkh@cpan.org>
 Date:   Sun Apr 11 19:15:45 2010 +0200
 
