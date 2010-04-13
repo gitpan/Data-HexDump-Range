@@ -1,4 +1,22 @@
-commit 1b21732ac6889135f062749561a5240aa5ce6b4a (HEAD, master)
+commit 74909c7657edb894efaee4cd7943ce7875fb2619 (HEAD, master)
+Author: nadim khemir <nkh@cpan.org>
+Date:   Wed Apr 14 01:27:56 2010 +0200
+
+    ADDED: user defined parsers
+
+commit 5ef08d2e6f8224978be11160fbb0a0d92439342f
+Author: nadim khemir <nkh@cpan.org>
+Date:   Tue Apr 13 23:23:20 2010 +0200
+
+    ADDED: DISPLAY_COLUMN_NAMES
+
+commit 5f10e8828a8374fabdae4a076958fa78193ce577
+Author: nadim khemir <nkh@cpan.org>
+Date:   Tue Apr 13 20:38:13 2010 +0200
+
+    ADDED: show range size in name
+
+commit 1b21732ac6889135f062749561a5240aa5ce6b4a
 Author: nadim khemir <nkh@cpan.org>
 Date:   Tue Apr 13 01:15:09 2010 +0200
 
