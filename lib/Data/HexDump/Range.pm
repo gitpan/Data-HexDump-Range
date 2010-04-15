@@ -34,6 +34,7 @@ use Carp qw(carp croak confess) ;
 use List::Util qw(min) ;
 use List::MoreUtils qw(all) ;
 use Scalar::Util qw(looks_like_number) ;
+use Term::ANSIColor ;
 
 #-------------------------------------------------------------------------------
 
@@ -72,43 +73,20 @@ to create an easy to understand dump of binary data. This achieved through:
 
 =head1 DOCUMENTATION
 
-The shortest perl dumper is C<perl -ne 'BEGIN{$/=\16} printf "%07x0: @{[unpack q{(H2)*}]}\n", $.-1'>, coutesy of a golfing session 
+The shortest perl dumper is C<perl -ne 'BEGIN{$/=\16} printf "%07x0: @{[unpack q{(H2)*}]}\n", $.-1'>, courtesy of a golfing session 
 with Andrew Rodland <arodland@cpan.org> aka I<hobbs> on #perl.
 
-B<hexd> from libma L<http://www.ioplex.com/~miallen/libmba/> is nice tools that inspired me to writr this module. It may be a better 
-alternative If you need speed when generating dumps.
+B<hexd> from libma L<http://www.ioplex.com/~miallen/libmba/> is nice tools that inspired me to write this module. It may be a better 
+alternative If you need very fast dump generation.
+
+priodev, tm604, Khisanth and other helped with the html output.
+
 
 B<Data::HexDump::Range> splits binary data according to user defined I<ranges> and rendered as a B<hex> or/and B<decimal> data dump.
 The data dump can be rendered in ANSI, ASCII or HTML.
 
 =head2 Orientation
 
-The examples below show the hypothetic ranges below applied to the source code of this module:
-
-  my $data_range = # definition to re-use
-	[
-	  ['data header', 5, 'blue on_cyan'],
-	  ['data', 20, 'blue on_bright_yellow'],
-	] ;
-
-  my $structured_range = 
-	[
-	  [
-	    ['magic cookie', 12, 'red'],
-	    ['padding', 32, 'yellow'],
-	    $data_range, 
-	  ],
-		
-	  [
-	    ['extra data', 12, undef],
-	    
-	    [
-	    $data_range, 
-	    ['footer', 4, 'bright_yellow on_red'],
-	    ]
-	  ],
-	] ;
-	
 =head3 Vertical
 
 In this orientation mode, each range displayed separately starting with the range name
@@ -125,6 +103,27 @@ followed by the binary data dump.
   data             00000056 00000000 53 75 62 3a 3a 45 78 70 6f 72 74 65 72 20 2d 73   Sub::Exporter -s
   data             00000066 00000010 65 74 75 70                                       etup
   footer           0000006a 00000000 20 3d 3e 20                                        =>
+
+
+
+=begin html
+
+<pre style ="font-family: monospace; background-color: #222 ;">
+
+<span style='color:#fff;'>RANGE_NAME       OFFSET   CUMULATI HEX_DUMP                                         ASCII_DUMP       </span> 
+<span style='color:#fff;'>                                   0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f   0123456789012345 </span> 
+<span style='color:#0f0;'>12:header       </span> <span style='color:#fff;'>00000000</span> <span style='color:#fff;'>00000000</span> <span style='color:#0f0;'>63 6f 6d 6d 69 74 20 37 34 39 30 39             </span> <span style='color:#0f0;'>commit 74909    </span> 
+<span style='color:#f00;'>"comment"</span> 
+<span style='color:#ff0;'><0:zero></span> 
+<span style='color:#ff0;'>10:name         </span> <span style='color:#fff;'>0000000c</span> <span style='color:#fff;'>00000000</span> <span style='color:#ff0;'>63 37 36 35 37 65 64 62 38 39                   </span> <span style='color:#ff0;'>c7657edb89      </span> 
+<span style='color:#f0f;'>5:offset        </span> <span style='color:#fff;'>00000016</span> <span style='color:#fff;'>00000000</span> <span style='color:#f0f;'>34 65 66 61 65                                  </span> <span style='color:#f0f;'>4efae           </span> 
+<span style='color:#f00;'>17:footer       </span> <span style='color:#fff;'>0000001b</span> <span style='color:#fff;'>00000000</span> <span style='color:#f00;'>65 34 63 64 37 39 34 33 63 65 37 38 37 35 66 62 </span> <span style='color:#f00;'>e4cd7943ce7875fb</span> 
+<span style='color:#f00;'>17:footer       </span> <span style='color:#fff;'>0000002b</span> <span style='color:#fff;'>00000010</span> <span style='color:#f00;'>32                                              </span> <span style='color:#f00;'>2               </span> 
+<span style='color:#fff;'>5:something     </span> <span style='color:#fff;'>0000002c</span> <span style='color:#fff;'>00000000</span> <span style='color:#fff;'>36 31 39 20 28                                  </span> <span style='color:#fff;'>619 (           </span> 
+
+</pre>
+
+=end
 
 =head3 Horizontal
 
@@ -193,10 +192,8 @@ The color definition is one of:
 
 =item * An ansi color definition - 'blue on_yellow'
 
-=item * A html color definition - eg todo: add example
+=item * A html color definition - eg 'background-color: #ffffcc; color: red'
  
-=item * An RGB color definition - eg: todo: add example
-
 =item * undef - will be repaced by a white color or picked from a cyclic color list (see B<COLOR> in L<new>).
 
 =back
@@ -296,7 +293,13 @@ a subroutine definition.
   
   $hdr->dump(['data', 100, \&alternate_color], $data) ;
 
-=head4  User defined range generator
+=head4 'range' sub ref
+
+  sub whole_range(['whole range', 5, 'on_yellow']}
+  
+  $hdr->dump([\&whole_range], $data) ; #note this is very different from L<User defined range generator>
+
+=head3  User defined range generator
 
 A subroutine reference can be passed as a range definition. The cubroutine will be called repetitively
 till the data is exhausted or the subroutine returns I<undef>.
@@ -317,9 +320,9 @@ till the data is exhausted or the subroutine returns I<undef>.
   my $hdr = Data::HexDump::Range->new() ;
   print $hdr->dump(\&my_parser, '01' x 50) ;
 
-=head2 user_defined_parser($data, $offset)
+=head2 my_parser($data, $offset)
 
-Add information, according to the options passed to the constructor, to the internal data.
+Returns a range description for the next range to dump
 
 I<Arguments> - See L<gather>
 
@@ -376,6 +379,7 @@ Readonly my $NEW_ARGUMENTS =>
 	OFFSET_FORMAT 
 	DATA_WIDTH 
 	DISPLAY_COLUMN_NAMES
+	DISPLAY_RULER
 	DISPLAY_OFFSET DISPLAY_CUMULATIVE_OFFSET
 	DISPLAY_ZERO_SIZE_RANGE_WARNING
 	DISPLAY_ZERO_SIZE_RANGE 
@@ -407,6 +411,7 @@ Create a Data::HexDump::Range object.
 		DISPLAY_RANGE_NAME => 1 ,
 		MAXIMUM_RANGE_NAME_SIZE => 16,
 		DISPLAY_COLUMN_NAMES => 0,
+		DISPLAY_RULER => 0,
 		DISPLAY_OFFSET  => 1 ,
 		DISPLAY_CUMULATIVE_OFFSET  => 1 ,
 		DISPLAY_ZERO_SIZE_RANGE_WARNING => 1,
@@ -452,6 +457,8 @@ in base 10. Default is 'hex'.
 =item * MAXIMUM_RANGE_NAME_SIZE - Integer - maximum size of a range name (horizontal mode). Default size is 16.
 
 =item * DISPLAY_COLUMN_NAMES - Boolean -  If set, the column names are displayed. Default I<false>
+
+=item * DISPLAY_RULER - Boolean - if set, a ruler is displayed above the dump, Default is I<false>
 
 =item * DISPLAY_OFFSET - Boolean - If set, the offset column is displayed. Default I<true>
 
@@ -549,8 +556,8 @@ $self->CheckOptionNames($NEW_ARGUMENTS, @setup_data) ;
 	COLORS =>
 		{
 		ASCII => [],
-		ANSI => ['white', 'green'],
-		HTML => ['?', '?'],
+		ANSI => ['white', 'green', 'bright_yellow','cyan', 'red' ],
+		HTML => ['white', 'green', 'bright_yellow','cyan', 'red' ],
 		},
 		
 	OFFSET_FORMAT => 'hex',
@@ -564,13 +571,26 @@ $self->CheckOptionNames($NEW_ARGUMENTS, @setup_data) ;
 	DISPLAY_RANGE_SIZE => 1,
 	
 	DISPLAY_COLUMN_NAMES  => 0 ,
+	DISPLAY_RULER => 0,
+	
 	DISPLAY_OFFSET => 1,
 	DISPLAY_CUMULATIVE_OFFSET => 1,
 	DISPLAY_HEX_DUMP => 1,
 	DISPLAY_DEC_DUMP => 0,
 	DISPLAY_ASCII_DUMP => 1,
 	
-	COLOR_NAMES => undef,
+	COLOR_NAMES => 
+		{
+		HTML =>
+			{
+			white => "style='color:#fff;'",
+			green => "style='color:#0f0;'",
+			bright_yellow => "style='color:#ff0;'",
+			yellow => "style='color:#ff0;'",
+			cyan => "style='color:#f0f;'",
+			red => "style='color:#f00;'",
+			},
+		},
 
 	ORIENTATION => 'horizontal',
 	
@@ -792,6 +812,8 @@ I<Exceptions> - None
 
 my ($self, $split_data) = @_ ;
 
+my @information ;
+
 if($self->{DISPLAY_COLUMN_NAMES})
 	{
 	my $information = '' ;
@@ -809,18 +831,67 @@ if($self->{DISPLAY_COLUMN_NAMES})
 				
 			$information .= sprintf "%-${length}.${length}s ", $field_name
 			}
-		else
-			{
-			$information .= ' ' ;
-			}
 		}
 		
-	unshift @{$split_data},
+	push @information,
 		{
-		INFORMATION => [ {INFORMATION => ' ' . $information} ], 
+		INFORMATION => [ {INFORMATION => $information} ], 
 		NEW_LINE => 1,
 		} ;
 	}
+
+if($self->{DISPLAY_RULER})
+	{
+	my $information = '' ;
+	
+	for my $field_name (@{$self->{FIELDS_TO_DISPLAY}})
+		{
+		if(exists $split_data->[0]{$field_name})
+			{
+			my $length = 0 ;
+			
+			for (@{$split_data->[0]{$field_name}})
+				{
+				$length += length($_->{$field_name}) ;
+				}
+				
+			for ($field_name)
+				{
+				/HEX_DUMP/ and do
+					{
+					$information .= join '', map {sprintf '%x  ' , $ _ % 16} (0 .. $self->{DATA_WIDTH} - 1) ;
+					$information .= ' ' ;
+					last ;
+					} ;
+					
+				/DEC_DUMP/ and do
+					{
+					$information .= join '', map {sprintf '%d   ' , $ _ % 10} (0 .. $self->{DATA_WIDTH} - 1) ;
+					$information .= ' ' ;
+					last ;
+					} ;
+					
+				/ASCII_DUMP/ and do
+					{
+					$information .= join '', map {$ _ % 10} (0 .. $self->{DATA_WIDTH} - 1) ;
+					$information .= ' ' ;
+					last ;
+					} ;
+					
+				$information .= ' ' x $length  . ' ' ;
+				}
+			}
+		}
+		
+	push @information,
+		{
+		RULER => [ {RULER=> $information} ], 
+		NEW_LINE => 1,
+		} ;
+	}
+	
+unshift @{$split_data}, @information ;
+
 }
 
 #-------------------------------------------------------------------------------
@@ -1280,21 +1351,23 @@ for my $data (@{$collected_data})
 	my $is_comment = ! defined $data->{DATA} ;
 	my ($start_quote, $end_quote) = $is_comment ? ('"', '"') : ('<', '>') ;
 	
+	$data->{COLOR} = $self->get_default_color()  unless defined $data->{COLOR} ;
+	
 	if($self->{ORIENTATION} =~ /^hor/)
 		{
 		my $last_data = $data == $collected_data->[-1] ? 1 : 0 ;
 		my $dumped_data = 0 ;
 		my $data_length = defined $data->{DATA} ? length($data->{DATA}) : 0 ;
 		
-		if(0 == $data_length && $self->{DISPLAY_ZERO_SIZE_RANGE})
+		if(0 == $data_length && $self->{DISPLAY_ZERO_SIZE_RANGE} && $self->{DISPLAY_RANGE_NAME})
 			{
 			my $name_size_quoted = $name_size - 2 ;
 			$name_size_quoted =  2 if $name_size_quoted < 2 ;
 			
 			push @{$line->{RANGE_NAME}},
 				{
-				'RANGE_NAME_COLOR' => $data->{COLOR},
 				'RANGE_NAME' => $start_quote . sprintf("%.${name_size_quoted}s", $data->{NAME}) . $end_quote,
+				'RANGE_NAME_COLOR' => $data->{COLOR},
 				},
 				{
 				'RANGE_NAME_COLOR' => undef,
@@ -1309,11 +1382,11 @@ for my $data (@{$collected_data})
 			
 			for my  $field_type 
 				(
-				['OFFSET', sub {@{$line->{OFFSET}} ? '' : sprintf $self->{OFFSET_FORMAT}, $self->{DATA_WIDTH} * @lines}, undef],
+				['OFFSET', sub {@{$line->{OFFSET}} ? '' : sprintf $self->{OFFSET_FORMAT}, $self->{DATA_WIDTH} * @lines}],
 				['HEX_DUMP', sub {sprintf '%02x ' x $size_to_dump, @_}, $data->{COLOR}, 3],
 				['DEC_DUMP', sub {sprintf '%03u ' x $size_to_dump, @_}, $data->{COLOR}, 4],
 				['ASCII_DUMP', sub {sprintf '%c' x $size_to_dump, map{$_ < 30 ? ord('.') : $_ } @_}, $data->{COLOR}, 1],
-				['RANGE_NAME',sub {sprintf "%.${name_size}s", $data->{NAME} ; }, $data->{COLOR}],
+				['RANGE_NAME',sub {sprintf "%.${name_size}s", $data->{NAME}}, $data->{COLOR}],
 				['RANGE_NAME', sub {', '}],
 				)
 				{
@@ -1356,7 +1429,7 @@ for my $data (@{$collected_data})
 		my $dumped_data = 0 ;
 		my $current_range = '' ;
 		
-		if(0 == $data_length && $self->{DISPLAY_ZERO_SIZE_RANGE})
+		if(0 == $data_length && $self->{DISPLAY_ZERO_SIZE_RANGE} && $self->{DISPLAY_RANGE_NAME})
 			{
 			push @{$line->{RANGE_NAME}},
 				{
@@ -1376,8 +1449,8 @@ for my $data (@{$collected_data})
 			for my  $field_type 
 				(
 				['RANGE_NAME',  sub {sprintf "%-${name_size}.${name_size}s", $data->{NAME} ; }, $data->{COLOR}] ,
-				['OFFSET', sub {sprintf $self->{OFFSET_FORMAT}, $total_dumped_data ;}, undef],
-				['CUMULATIVE_OFFSET', sub {sprintf $self->{OFFSET_FORMAT}, $dumped_data}, undef],
+				['OFFSET', sub {sprintf $self->{OFFSET_FORMAT}, $total_dumped_data ;}],
+				['CUMULATIVE_OFFSET', sub {sprintf $self->{OFFSET_FORMAT}, $dumped_data}],
 				['HEX_DUMP', sub {sprintf '%02x ' x $size_to_dump, @_}, $data->{COLOR}, 3],
 				['DEC_DUMP', sub {sprintf '%03u ' x $size_to_dump, @_}, $data->{COLOR}, 4],
 				['ASCII_DUMP', sub {sprintf '%c' x $size_to_dump, map{$_ < 30 ? ord('.') : $_ } @_}, $data->{COLOR}, 1],
@@ -1476,36 +1549,40 @@ my ($self, $line_data) = @_ ;
 
 my $formated = '' ;
 
+my @fields = @{$self->{FIELDS_TO_DISPLAY}} ;
+unshift @fields, 'INFORMATION', 'RULER' ;
+
+
 for ($self->{FORMAT})
 	{
 	/ASCII/ || /ANSI/ and do
 		{
-		use Term::ANSIColor ;
-	
 		my $colorizer = /ASCII/ ? sub {$_[0]} : \&colored ;
 		
-		my @fields = @{$self->{FIELDS_TO_DISPLAY}} ;
-		unshift @fields, 'INFORMATION' ;
-
 		for my $line (@{$line_data})
 			{
-			my $default_color = $self->get_default_color() ;
-			
 			for my $field (@fields)
 				{
 				if(exists $line->{$field})
 					{
 					for my $range (@{$line->{$field}})
 						{
-						my $user_color = defined $self->{COLOR_NAMES} &&  defined $range->{"${field}_COLOR"}
+						my $user_color = (defined $self->{COLOR_NAMES} &&  defined $range->{"${field}_COLOR"})
 										? $self->{COLOR_NAMES} {$self->{FORMAT}}{$range->{"${field}_COLOR"}}  ||  $range->{"${field}_COLOR"}
 										: $range->{"${field}_COLOR"} ;
 						
-						$formated .= $colorizer->($range->{$field}, $user_color || $default_color) ;
+						if(defined $user_color )
+							{
+							$formated .= $colorizer->($range->{$field}, $user_color) ;
+							}
+						else
+							{
+							$formated .= $range->{$field} ;
+							}
 						}
+						
+					$formated .= ' '
 					}
-					
-				$formated .= ' '
 				}
 				
 			$formated .= "\n" if $line->{NEW_LINE} ;
@@ -1514,8 +1591,35 @@ for ($self->{FORMAT})
 		
 	/HTML/ and do
 		{
-		} ;
+		$formated = <<'EOH' ;
+<pre style ="font-family: monospace; background-color: #222 ;">
+
+EOH
+		for my $line (@{$line_data})
+			{
+			for my $field (@fields)
+				{
+				if(exists $line->{$field})
+					{
+					for my $range (@{$line->{$field}})
+						{
+						my $user_color = (defined $self->{COLOR_NAMES} &&  defined $range->{"${field}_COLOR"})
+										? $self->{COLOR_NAMES} {$self->{FORMAT}}{$range->{"${field}_COLOR"}}  ||  $range->{"${field}_COLOR"}
+										: $range->{"${field}_COLOR"} ;
+						
+						$user_color = "style='color:#fff;'" unless defined $user_color ;
+						$formated .= "<span $user_color>" . $range->{$field} . "</span>" ;
+						}
+						
+					$formated .= ' ' ;
+					}
+				}
+				
+			$formated .= "\n" if $line->{NEW_LINE} ;
+			}
 		
+		$formated .= "\n</pre>\n" ;
+		} ;
 	}
 	
 return $formated ;

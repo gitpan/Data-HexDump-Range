@@ -1,4 +1,24 @@
-commit 74909c7657edb894efaee4cd7943ce7875fb2619 (HEAD, master)
+commit a633d55dc5629aa214116e25257e5e73b1d0a76f (HEAD, master)
+Author: nadim khemir <nkh@cpan.org>
+Date:   Thu Apr 15 02:28:05 2010 +0200
+
+    ADDED: HTML rendering
+
+commit 8177c24de8f7d0af4574840718129655f80dc9c9
+Author: nadim khemir <nkh@cpan.org>
+Date:   Wed Apr 14 21:41:47 2010 +0200
+
+    ADDED: horizontal ruler
+    ADDED: max dump size to hdr
+
+commit 022692181f497f59a5eb9d8dd6b8ce00e76d5e75
+Author: nadim khemir <nkh@cpan.org>
+Date:   Wed Apr 14 16:49:46 2010 +0200
+
+    FIXED: cycle colors should not change before range is changed
+    FIXED: comment and zero size  show when -show_range_name 0
+
+commit 74909c7657edb894efaee4cd7943ce7875fb2619
 Author: nadim khemir <nkh@cpan.org>
 Date:   Wed Apr 14 01:27:56 2010 +0200
 
