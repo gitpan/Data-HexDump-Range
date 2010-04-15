@@ -1,4 +1,11 @@
-commit a633d55dc5629aa214116e25257e5e73b1d0a76f (HEAD, master)
+commit 6b7649e960013f53dea70326a0fbd550242d1f35 (HEAD, master)
+Author: nadim khemir <nkh@cpan.org>
+Date:   Fri Apr 16 00:27:38 2010 +0200
+
+    FIXED: missing =end html in pod
+    ADDED: bitfield rendering (parsing not done yet)
+
+commit a633d55dc5629aa214116e25257e5e73b1d0a76f
 Author: nadim khemir <nkh@cpan.org>
 Date:   Thu Apr 15 02:28:05 2010 +0200
 
