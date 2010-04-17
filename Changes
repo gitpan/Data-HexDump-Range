@@ -1,4 +1,10 @@
-commit 6b7649e960013f53dea70326a0fbd550242d1f35 (HEAD, master)
+commit 30fce50547b3f8b3d15426eeb00dd278fd6d7f3a (HEAD, master)
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sat Apr 17 03:28:11 2010 +0200
+
+    ADDED: bitfield description parsing
+
+commit 6b7649e960013f53dea70326a0fbd550242d1f35
 Author: nadim khemir <nkh@cpan.org>
 Date:   Fri Apr 16 00:27:38 2010 +0200
 
