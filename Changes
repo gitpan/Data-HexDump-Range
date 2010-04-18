@@ -1,4 +1,41 @@
-commit 30fce50547b3f8b3d15426eeb00dd278fd6d7f3a (HEAD, master)
+commit 8809c8e84eb323bbaa3669e948b685026c35fa59 (HEAD, master)
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sun Apr 18 03:32:03 2010 +0200
+
+    ADDED: DISPLAY_BITFIELDS
+
+commit ec569e83dfb7ed8081b183b24716b22fee7e21be
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sat Apr 17 17:59:35 2010 +0200
+
+    ADDED: handle range size passed in as a sub ref
+
+commit 29d36b48ff01b4f4726f622da08ec83b31f5daee
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sat Apr 17 15:46:28 2010 +0200
+
+    CHANGED: refactored coloring code
+    ADDED: output format verification
+
+commit e02b998d6e21d58234a6352a344d508426804a9e
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sat Apr 17 15:12:00 2010 +0200
+
+    CHANGED: split into four modules
+
+commit 48fc8e0c2c8d888206f7e8b794fe9ffdef0ab833
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sat Apr 17 14:10:53 2010 +0200
+
+    FIXED: comment fields had data
+
+commit 1446b791f6812db7bb6108da1d818e608c2a5658
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sat Apr 17 13:02:57 2010 +0200
+
+    CHANGED: act more like a standard hexdumper if no arguments are given
+
+commit 30fce50547b3f8b3d15426eeb00dd278fd6d7f3a
 Author: nadim khemir <nkh@cpan.org>
 Date:   Sat Apr 17 03:28:11 2010 +0200
 

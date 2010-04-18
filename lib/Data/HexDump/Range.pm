@@ -35,6 +35,11 @@ use List::Util qw(min) ;
 use List::MoreUtils qw(all) ;
 use Scalar::Util qw(looks_like_number) ;
 use Term::ANSIColor ;
+use Data::TreeDumper ;
+
+use Data::HexDump::Range::Gather ;
+use Data::HexDump::Range::Split ;
+use Data::HexDump::Range::Format ;
 
 #-------------------------------------------------------------------------------
 
@@ -50,10 +55,8 @@ Data::HexDump::Range - Hexadecial Range Dumper
   
   $hdr->gather(['magic cookie', 12, 'red'], $data) ; 
   $hdr->gather(['image type', 2, 'green'], $other_data) ;
-  $hdr->gather(['image data ...', 100, 'yellow'], $more_data, 0, CONSUME_ALL_DATA) ;
   
   print $hdr->dump_gathered() ;
-  
   $hdr->reset() ;
 
 =head1 DESCRIPTION
@@ -67,6 +70,8 @@ to create an easy to understand dump of binary data. This achieved through:
 
 =item * Multiple rendering modes with different output formats
 
+=item * Bitfield rendering
+
 =item * The possibility to describe complex structures
 
 =back
@@ -74,73 +79,18 @@ to create an easy to understand dump of binary data. This achieved through:
 =head1 DOCUMENTATION
 
 The shortest perl dumper is C<perl -ne 'BEGIN{$/=\16} printf "%07x0: @{[unpack q{(H2)*}]}\n", $.-1'>, courtesy of a golfing session 
-with Andrew Rodland <arodland@cpan.org> aka I<hobbs> on #perl.
+with Andrew Rodland <arodland@cpan.org> aka I<hobbs>. I<priodev>, I<tm604>, I<Khisanth> and other helped with the html output.
 
 B<hexd> from libma L<http://www.ioplex.com/~miallen/libmba/> is nice tools that inspired me to write this module. It may be a better 
 alternative If you need very fast dump generation.
 
-priodev, tm604, Khisanth and other helped with the html output.
-
-
 B<Data::HexDump::Range> splits binary data according to user defined I<ranges> and rendered as a B<hex> or/and B<decimal> data dump.
 The data dump can be rendered in ANSI, ASCII or HTML.
 
-=head2 Orientation
+=head2 Rendered Columns
 
-=head3 Vertical
-
-In this orientation mode, each range displayed separately starting with the range name
-followed by the binary data dump. 
-
-  magic cookie     00000000 00000000 0a 70 61 63 6b 61 67 65 20 44 61 74               .package Dat
-  padding          0000000c 00000000 61 3a 3a 48 65 78 44 75 6d 70 3a 3a 52 61 6e 67   a::HexDump::Rang
-  padding          0000001c 00000010 65 20 3b 0a 0a 75 73 65 20 73 74 72 69 63 74 3b   e ;..use strict;
-  data header      0000002c 00000000 0a 75 73 65 20                                    .use
-  data             00000031 00000000 77 61 72 6e 69 6e 67 73 20 3b 0a 75 73 65 20 43   warnings ;.use C
-  data             00000041 00000010 61 72 70 20                                       arp
-  extra data       00000045 00000000 3b 0a 0a 42 45 47 49 4e 20 0a 7b 0a               ;..BEGIN .{.
-  data header      00000051 00000000 0a 75 73 65 20                                    .use
-  data             00000056 00000000 53 75 62 3a 3a 45 78 70 6f 72 74 65 72 20 2d 73   Sub::Exporter -s
-  data             00000066 00000010 65 74 75 70                                       etup
-  footer           0000006a 00000000 20 3d 3e 20                                        =>
-
-
-
-=begin html
-
-<pre style ="font-family: monospace; background-color: #222 ;">
-
-<span style='color:#fff;'>RANGE_NAME       OFFSET   CUMULATI HEX_DUMP                                         ASCII_DUMP       </span> 
-<span style='color:#fff;'>                                   0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f   0123456789012345 </span> 
-<span style='color:#0f0;'>12:header       </span> <span style='color:#fff;'>00000000</span> <span style='color:#fff;'>00000000</span> <span style='color:#0f0;'>63 6f 6d 6d 69 74 20 37 34 39 30 39             </span> <span style='color:#0f0;'>commit 74909    </span> 
-<span style='color:#f00;'>"comment"</span> 
-<span style='color:#ff0;'><0:zero></span> 
-<span style='color:#ff0;'>10:name         </span> <span style='color:#fff;'>0000000c</span> <span style='color:#fff;'>00000000</span> <span style='color:#ff0;'>63 37 36 35 37 65 64 62 38 39                   </span> <span style='color:#ff0;'>c7657edb89      </span> 
-<span style='color:#f0f;'>5:offset        </span> <span style='color:#fff;'>00000016</span> <span style='color:#fff;'>00000000</span> <span style='color:#f0f;'>34 65 66 61 65                                  </span> <span style='color:#f0f;'>4efae           </span> 
-<span style='color:#f00;'>17:footer       </span> <span style='color:#fff;'>0000001b</span> <span style='color:#fff;'>00000000</span> <span style='color:#f00;'>65 34 63 64 37 39 34 33 63 65 37 38 37 35 66 62 </span> <span style='color:#f00;'>e4cd7943ce7875fb</span> 
-<span style='color:#f00;'>17:footer       </span> <span style='color:#fff;'>0000002b</span> <span style='color:#fff;'>00000010</span> <span style='color:#f00;'>32                                              </span> <span style='color:#f00;'>2               </span> 
-<span style='color:#fff;'>5:something     </span> <span style='color:#fff;'>0000002c</span> <span style='color:#fff;'>00000000</span> <span style='color:#fff;'>36 31 39 20 28                                  </span> <span style='color:#fff;'>619 (           </span> 
-
-</pre>
-
-=end html
-
-=head3 Horizontal
-
-In this mode, the data are packed together in the dump
-
-  00000000 0a 70 61 63 6b 61 67 65 20 44 61 74 61 3a 3a 48   .package Data::H magic cookie, padding,
-  00000010 65 78 44 75 6d 70 3a 3a 52 61 6e 67 65 20 3b 0a   exDump::Range ;. padding,
-  00000020 0a 75 73 65 20 73 74 72 69 63 74 3b 0a 75 73 65   .use strict;.use padding, data header,
-  00000030 20 77 61 72 6e 69 6e 67 73 20 3b 0a 75 73 65 20    warnings ;.use  data header, data,
-  00000040 43 61 72 70 20 3b 0a 0a 42 45 47 49 4e 20 0a 7b   Carp ;..BEGIN .{ data, extra data,
-  00000050 0a 0a 75 73 65 20 53 75 62 3a 3a 45 78 70 6f 72   ..use Sub::Expor extra data, data header, data,
-  00000060 74 65 72 20 2d 73 65 74 75 70 20 3d 3e 20         ter -setup =>    data, footer,
-
-=head2 Rendered fields
-
-You can choose which fields are rendered by setting options when creating a Data::HexDump::Range object.
-The default rendering corresponds to the following object construction:
+You can choose which columns are rendered by setting options when creating a Data::HexDump::Range object.
+The default rendering corresponds to the object below:
 
   Data::HexDump::Range->new
 	(
@@ -160,7 +110,93 @@ The default rendering corresponds to the following object construction:
 	DATA_WIDTH => 16,
 	) ;
 
-See L<new>.
+If you decided that you wanted the binary data to be showed in decimal instead for hexadecimal, you' set B<DISPLAY_HEX_DUMP => 0> and B<DISPLAY_DEC_DUMP => 1>.
+See L<new> for all the possible options. Most option are also available from the command line utility I<hdr>.
+
+=head2 Orientation
+
+Command I<hdr -r 'magic cookie,12:padding, 32:header,5:data, 20:extra data,#:header,5:data,40:footer,4' -col -o ver -display_ruler 1 lib/Data/HexDump/Range.pm>
+
+=head3 Vertical
+
+In this orientation mode, each range displayed on a separate line.
+
+ RANGE_NAME       OFFSET   CUMULATI HEX_DUMP                                         ASCII_DUMP
+                                    0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f   0123456789012345
+ magic cookie     00000000 00000000 0a 70 61 63 6b 61 67 65 20 44 61 74              .package Dat
+ padding          0000000c 00000000 61 3a 3a 48 65 78 44 75 6d 70 3a 3a 52 61 6e 67  a::HexDump::Rang
+ padding          0000001c 00000010 65 20 3b 0a 0a 75 73 65 20 73 74 72 69 63 74 3b  e ;..use strict;
+ header           0000002c 00000000 0a 75 73 65 20                                   .use
+ data             00000031 00000000 77 61 72 6e 69 6e 67 73 20 3b 0a 75 73 65 20 43  warnings ;.use C
+ data             00000041 00000010 61 72 70 20                                      arp
+ "extra data"
+ header           00000045 00000000 3b 0a 0a 42 45                                   ;..BE
+ data             0000004a 00000000 47 49 4e 20 0a 7b 0a 0a 75 73 65 20 53 75 62 3a  GIN .{..use Sub:
+ data             0000005a 00000010 3a 45 78 70 6f 72 74 65 72 20 2d 73 65 74 75 70  :Exporter -setup
+ data             0000006a 00000020 20 3d 3e 20 0a 09 7b 0a                           => ..{.
+ footer           00000072 00000000 09 65 78 70                                      .exp
+
+In colors:
+
+=begin html
+
+<pre style ="font-family: monospace; background-color: #000 ;">
+
+<span style='color:#fff;'>RANGE_NAME       OFFSET   CUMULATI HEX_DUMP                                         ASCII_DUMP       </span> 
+<span style='color:#fff;'>                                   0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f   0123456789012345 </span> 
+<span style='color:#0f0;'>magic cookie    </span> <span style='color:#fff;'>00000000</span> <span style='color:#fff;'>00000000</span> <span style='color:#0f0;'>0a 70 61 63 6b 61 67 65 20 44 61 74             </span> <span style='color:#0f0;'>.package Dat    </span> 
+<span style='color:#ff0;'>padding         </span> <span style='color:#fff;'>0000000c</span> <span style='color:#fff;'>00000000</span> <span style='color:#ff0;'>61 3a 3a 48 65 78 44 75 6d 70 3a 3a 52 61 6e 67 </span> <span style='color:#ff0;'>a::HexDump::Rang</span> 
+<span style='color:#ff0;'>padding         </span> <span style='color:#fff;'>0000001c</span> <span style='color:#fff;'>00000010</span> <span style='color:#ff0;'>65 20 3b 0a 0a 75 73 65 20 73 74 72 69 63 74 3b </span> <span style='color:#ff0;'>e ;..use strict;</span> 
+<span style='color:#f0f;'>header          </span> <span style='color:#fff;'>0000002c</span> <span style='color:#fff;'>00000000</span> <span style='color:#f0f;'>0a 75 73 65 20                                  </span> <span style='color:#f0f;'>.use            </span> 
+<span style='color:#f00;'>data            </span> <span style='color:#fff;'>00000031</span> <span style='color:#fff;'>00000000</span> <span style='color:#f00;'>77 61 72 6e 69 6e 67 73 20 3b 0a 75 73 65 20 43 </span> <span style='color:#f00;'>warnings ;.use C</span> 
+<span style='color:#f00;'>data            </span> <span style='color:#fff;'>00000041</span> <span style='color:#fff;'>00000010</span> <span style='color:#f00;'>61 72 70 20                                     </span> <span style='color:#f00;'>arp             </span> 
+<span style='color:#fff;'>"extra data"</span> 
+<span style='color:#0f0;'>header          </span> <span style='color:#fff;'>00000045</span> <span style='color:#fff;'>00000000</span> <span style='color:#0f0;'>3b 0a 0a 42 45                                  </span> <span style='color:#0f0;'>;..BE           </span> 
+<span style='color:#ff0;'>data            </span> <span style='color:#fff;'>0000004a</span> <span style='color:#fff;'>00000000</span> <span style='color:#ff0;'>47 49 4e 20 0a 7b 0a 0a 75 73 65 20 53 75 62 3a </span> <span style='color:#ff0;'>GIN .{..use Sub:</span> 
+<span style='color:#ff0;'>data            </span> <span style='color:#fff;'>0000005a</span> <span style='color:#fff;'>00000010</span> <span style='color:#ff0;'>3a 45 78 70 6f 72 74 65 72 20 2d 73 65 74 75 70 </span> <span style='color:#ff0;'>:Exporter -setup</span> 
+<span style='color:#ff0;'>data            </span> <span style='color:#fff;'>0000006a</span> <span style='color:#fff;'>00000020</span> <span style='color:#ff0;'>20 3d 3e 20 0a 09 7b 0a                         </span> <span style='color:#ff0;'> => ..{.        </span> 
+<span style='color:#f0f;'>footer          </span> <span style='color:#fff;'>00000072</span> <span style='color:#fff;'>00000000</span> <span style='color:#f0f;'>09 65 78 70                                     </span> <span style='color:#f0f;'>.exp            </span> 
+
+</pre>
+
+=end html
+
+=head3 Horizontal
+
+In this mode, the data are packed together in the dump
+
+ OFFSET   HEX_DUMP                                         ASCII_DUMP       RANGE_NAME
+          0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f   0123456789012345
+ 00000000 0a 70 61 63 6b 61 67 65 20 44 61 74 61 3a 3a 48  .package Data::H magic cookie, padding,
+ 00000020 65 78 44 75 6d 70 3a 3a 52 61 6e 67 65 20 3b 0a  exDump::Range ;. padding,
+ 00000030 0a 75 73 65 20 73 74 72 69 63 74 3b 0a 75 73 65  .use strict;.use padding, header,
+ 00000050 20 77 61 72 6e 69 6e 67 73 20 3b 0a 75 73 65 20   warnings ;.use  header, data,
+ 00000070 43 61 72 70 20 3b 0a 0a 42 45 47 49 4e 20 0a 7b  Carp ;..BEGIN .{ data, "extra data", header, data,
+ 000000a0 0a 0a 75 73 65 20 53 75 62 3a 3a 45 78 70 6f 72  ..use Sub::Expor data,
+ 000000b0 74 65 72 20 2d 73 65 74 75 70 20 3d 3e 20 0a 09  ter -setup => .. data,
+ 000000c0 7b 0a 09 65 78 70                                {..exp           data, footer,
+
+In colors:
+
+
+=begin html
+
+<pre style ="font-family: monospace; background-color: #000 ;">
+
+<span style='color:#fff;'>OFFSET   HEX_DUMP                                         ASCII_DUMP       RANGE_NAME              </span> 
+<span style='color:#fff;'>         0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f   0123456789012345                         </span> 
+<span style='color:#fff;'>00000000</span><span style='color:#fff;'></span> <span style='color:#0f0;'>0a 70 61 63 6b 61 67 65 20 44 61 74 </span><span style='color:#ff0;'>61 3a 3a 48 </span> <span style='color:#0f0;'>.package Dat</span><span style='color:#ff0;'>a::H</span> <span style='color:#0f0;'>magic cookie</span><span style='color:#fff;'>, </span><span style='color:#ff0;'>padding</span><span style='color:#fff;'>, </span> 
+<span style='color:#fff;'>00000020</span> <span style='color:#ff0;'>65 78 44 75 6d 70 3a 3a 52 61 6e 67 65 20 3b 0a </span> <span style='color:#ff0;'>exDump::Range ;.</span> <span style='color:#ff0;'>padding</span><span style='color:#fff;'>, </span> 
+<span style='color:#fff;'>00000030</span><span style='color:#fff;'></span> <span style='color:#ff0;'>0a 75 73 65 20 73 74 72 69 63 74 3b </span><span style='color:#f0f;'>0a 75 73 65 </span> <span style='color:#ff0;'>.use strict;</span><span style='color:#f0f;'>.use</span> <span style='color:#ff0;'>padding</span><span style='color:#fff;'>, </span><span style='color:#f0f;'>header</span><span style='color:#fff;'>, </span> 
+<span style='color:#fff;'>00000050</span><span style='color:#fff;'></span> <span style='color:#f0f;'>20 </span><span style='color:#f00;'>77 61 72 6e 69 6e 67 73 20 3b 0a 75 73 65 20 </span> <span style='color:#f0f;'> </span><span style='color:#f00;'>warnings ;.use </span> <span style='color:#f0f;'>header</span><span style='color:#fff;'>, </span><span style='color:#f00;'>data</span><span style='color:#fff;'>, </span> 
+<span style='color:#fff;'>00000070</span><span style='color:#fff;'></span><span style='color:#fff;'></span> <span style='color:#f00;'>43 61 72 70 20 </span><span style='color:#0f0;'>3b 0a 0a 42 45 </span><span style='color:#ff0;'>47 49 4e 20 0a 7b </span> <span style='color:#f00;'>Carp </span><span style='color:#0f0;'>;..BE</span><span style='color:#ff0;'>GIN .{</span> <span style='color:#f00;'>data</span><span style='color:#fff;'>, </span><span style='color:#fff;'>"extra data"</span><span style='color:#fff;'>, </span><span style='color:#0f0;'>header</span><span style='color:#fff;'>, </span><span style='color:#ff0;'>data</span><span style='color:#fff;'>, </span> 
+<span style='color:#fff;'>000000a0</span> <span style='color:#ff0;'>0a 0a 75 73 65 20 53 75 62 3a 3a 45 78 70 6f 72 </span> <span style='color:#ff0;'>..use Sub::Expor</span> <span style='color:#ff0;'>data</span><span style='color:#fff;'>, </span> 
+<span style='color:#fff;'>000000b0</span> <span style='color:#ff0;'>74 65 72 20 2d 73 65 74 75 70 20 3d 3e 20 0a 09 </span> <span style='color:#ff0;'>ter -setup => ..</span> <span style='color:#ff0;'>data</span><span style='color:#fff;'>, </span> 
+<span style='color:#fff;'>000000c0</span><span style='color:#fff;'></span> <span style='color:#ff0;'>7b 0a </span><span style='color:#f0f;'>09 65 78 70                               </span> <span style='color:#ff0;'>{.</span><span style='color:#f0f;'>.exp          </span> <span style='color:#ff0;'>data</span><span style='color:#fff;'>, </span><span style='color:#f0f;'>footer</span><span style='color:#fff;'>, </span> 
+
+</pre>
+
+=end html
 
 =head2 Range definition
 
@@ -180,17 +216,15 @@ Ranges are Array references containing four (4) elements:
 
 =back
 
-Any of the three first elements can be replaced by a subroutine reference. See L<Dynamic range definition> below.
+Any of the elements can be replaced by a subroutine reference. See L<Dynamic range definition> below.
 
 You can also declare the ranges in a string. The string use the format used by the I<hdr> command line range dumper
 that was installed by this module.
 
 Example:
 
-  hdr -r 'header,12:name,10:xx, 2:yy,2:offset,4:BITMAP,4,bright_yellow,hi:ff,x2b2:fx,b32:f0,b16: \
-       field,x8b8:field2, b17:footer,17:something,5'  \
-       -col -display_ruler -display_range_size 1 -show_dec_dump 1 -o ver my_data_file
-
+I<hdr --col -display_ruler -o ver lib/Data/HexDump/Range.pm -r 'header,12:name,10:magic,2:offset,4:BITMAP,4,bright_yellow:ff,x2b2:fx,b32:f0,b16:field,x8b8:field2, b17:footer,20'>
+       
 TODO: document string range format
 
 =head3 Coloring
@@ -267,50 +301,50 @@ If the size of a range is the string '#', the whole range is considered a commen
 
 Bitfields can be up to 32 bits long and can overlap each other. Bitfields are applied on the previously defined range.
 
-  hdr -r 'BITMAP,4,bright_yellow:ff,x2b2:fx,3b17:f0,7b13' -col -o ver ~/my_file
+In the example below, bitfields I<ff, fx, f0> are extracted form the data defined by the I<MYDATA> range.
 
+                 .------------.                      .--------------.
+                 | data range |                      | data hexdump |
+ .---.           '------------'                      '--------------'
+ | b |                  |                                    |
+ | i |     RANGE_NAME   |   OFFSET   CUMULATI HEX_DUMP       |                                 ASCII_DUMP     
+ | t |     MYDATA  <----'   00000000 00000000 63 6f 6d 6d <--'                                 comm           
+ | f |   ^ .ff              02 .. 03          -- -- -- 02 --10----------------------------     .bitfield: ---.
+ | i |---> .fx              03 .. 19          -- 00 36 f6 ---00011011011110110------------     .bitfield: -.6?
+ | e |   v .f0              07 .. 17          -- -- 05 bd -------10110111101--------------     .bitfield: --.?
+ | l |                         ^                    ^                     ^                          ^
+ | d |                         |                    |                     |                          |
+ | s |             .----------------------.-------------------.----------------------.    .---------------------.
+ '---'             | start bit .. end bit | bitfields hexdump | bitfield binary dump |    | bitfield ascci dump |
+                   '----------------------'-------------------'----------------------'    '---------------------'
 
-In the I<hdr> example above, four bitfields I<ff, fx, f0> are defined. They will be applied on the data defined by the
-I<BITMAP> range.
+The the format definiton  is: an optional "x (for offset) + offset" + "b (for bits) + number of bits". Eg: I<x8b8> second byte in MYDATA.
 
+An example output containing normal data and bifields dumps.
 
-
-                   .------------.                      .--------------.
-                   | data range |                      | data hexdump |
-                   '------------'                      '--------------'
-                          |                                    |
-                          |                                    |
-             RANGE_NAME   |   OFFSET   CUMULATI HEX_DUMP       |                                 ASCII_DUMP     
-             BITMAP  <----'   00000000 00000000 63 6f 6d 6d <--'                                 comm           
-         .-> .ff              02 .. 03          -- -- -- 02 --10----------------------------     .bitfield: ---.
-         .-> .fx              03 .. 19          -- 00 36 f6 ---00011011011110110------------     .bitfield: -.6?
-         .-> .f0              07 .. 17          -- -- 05 bd -------10110111101--------------     .bitfield: --.?
-         |                        ^                   ^                   ^                            ^
-         |                        |                   |                   |                            |
-      .-----------.     .-------------------.         |       .----------------------.      .---------------------.
-      | bitfields |     | start and end bit |         |       | bitfield binary dump |      | bitfield ascci dump |
-      '-----------'     '-------------------'         |       '----------------------'      '---------------------'
-                                            .-------------------.
-                                            | bitfields hexdump |
-                                            '-------------------'
-
-The definiton follows the format an optional "x (for offset) + offset" + "b (for bits) + number of bits".
-
-The dump with colors:
+command: I<hdr --col -display_ruler -o ver -r 'header,12:name,10:magic, 2:offset,4:BITMAP,4,bright_yellow:ff,x2b2:fx,b32:f0,b16::footer,16' file_name
 
 =begin html
 
 <pre style ="font-family: monospace; background-color: #000 ;">
 
 <span style='color:#fff;'>RANGE_NAME       OFFSET   CUMULATI HEX_DUMP                                         ASCII_DUMP       </span> 
-<span style='color:#ff0;'>BITMAP          </span> <span style='color:#fff;'>00000000</span> <span style='color:#fff;'>00000000</span> <span style='color:#ff0;'>63 6f 6d 6d                                     </span> <span style='color:#ff0;'>comm            </span> 
-<span style='color:#0f0;'>.ff             </span> <span style='color:#0f0;'>02 .. 03</span> <span style='color:#0f0;'>        </span> <span style='color:#0f0;'>-- -- -- 02 --10----------------------------    </span> <span style='color:#0f0;'>.bitfield: ---. </span> 
-<span style='color:#ff0;'>.fx             </span> <span style='color:#ff0;'>03 .. 19</span> <span style='color:#ff0;'>        </span> <span style='color:#ff0;'>-- 00 36 f6 ---00011011011110110------------    </span> <span style='color:#ff0;'>.bitfield: -.6ö </span> 
-<span style='color:#f0f;'>.f0             </span> <span style='color:#f0f;'>07 .. 19</span> <span style='color:#f0f;'>        </span> <span style='color:#f0f;'>-- -- 16 f6 -------1011011110110------------    </span> <span style='color:#f0f;'>.bitfield: --.ö </span> 
+<span style='color:#fff;'>                                   0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f   0123456789012345 </span> 
+<span style='color:#0f0;'>header          </span> <span style='color:#fff;'>00000000</span> <span style='color:#fff;'>00000000</span> <span style='color:#0f0;'>0a 70 61 63 6b 61 67 65 20 44 61 74             </span> <span style='color:#0f0;'>.package Dat    </span> 
+<span style='color:#ff0;'>name            </span> <span style='color:#fff;'>0000000c</span> <span style='color:#fff;'>00000000</span> <span style='color:#ff0;'>61 3a 3a 48 65 78 44 75 6d 70                   </span> <span style='color:#ff0;'>a::HexDump      </span> 
+<span style='color:#f0f;'>magic           </span> <span style='color:#fff;'>00000016</span> <span style='color:#fff;'>00000000</span> <span style='color:#f0f;'>3a 3a                                           </span> <span style='color:#f0f;'>::              </span> 
+<span style='color:#f00;'>offset          </span> <span style='color:#fff;'>00000018</span> <span style='color:#fff;'>00000000</span> <span style='color:#f00;'>52 61 6e 67                                     </span> <span style='color:#f00;'>Rang            </span> 
+<span style='color:#ff0;'>MYDATA          </span> <span style='color:#fff;'>0000001c</span> <span style='color:#fff;'>00000000</span> <span style='color:#ff0;'>65 20 3b 0a                                     </span> <span style='color:#ff0;'>e ;.            </span> 
+<span style='color:#fff;'>.ff             </span> <span style='color:#fff;'>02 .. 03</span> <span style='color:#fff;'>        </span> <span style='color:#fff;'>-- -- -- 02 --10----------------------------    </span> <span style='color:#fff;'>.bitfield: ---. </span> 
+<span style='color:#0f0;'>.fx             </span> <span style='color:#0f0;'>00 .. 31</span> <span style='color:#0f0;'>        </span> <span style='color:#0f0;'>65 20 3b 0a 01100101001000000011101100001010    </span> <span style='color:#0f0;'>.bitfield: e ;. </span> 
+<span style='color:#ff0;'>.f0             </span> <span style='color:#ff0;'>00 .. 15</span> <span style='color:#ff0;'>        </span> <span style='color:#ff0;'>-- -- 65 20 0110010100100000----------------    </span> <span style='color:#ff0;'>.bitfield: --e  </span> 
+<span style='color:#f0f;'>footer          </span> <span style='color:#fff;'>00000020</span> <span style='color:#fff;'>00000000</span> <span style='color:#f0f;'>0a 75 73 65 20 73 74 72 69 63 74 3b 0a 75 73 65 </span> <span style='color:#f0f;'>.use strict;.use</span> 
 
 </pre>
 
 =end html
+
+B<NOTE!> This is under heavy developemnt. Complete error handling and indianess support are under way.
 
 =head3 Dynamic range definition
 
@@ -410,7 +444,7 @@ OR
 
 =head1 EXAMPLES
 
-See L<HDR.html>
+See L<hdr_user_manual>
 
 =head1 OTHER IDEAS
 
@@ -429,12 +463,12 @@ Subroutines prefixed with B<[P]> are not part of the public API and shall not be
 
 #-------------------------------------------------------------------------------
 
-Readonly my $RANGE_DEFINITON_FIELDS => 4 ;
-
 Readonly my $NEW_ARGUMENTS => 	
 	[
 	qw(
 	NAME INTERACTION VERBOSE
+	
+	DUMP_RANGE_DESCRIPTION
 	
 	FORMAT 
 	COLOR 
@@ -442,7 +476,8 @@ Readonly my $NEW_ARGUMENTS =>
 	DATA_WIDTH 
 	DISPLAY_COLUMN_NAMES
 	DISPLAY_RULER
-	DISPLAY_OFFSET DISPLAY_CUMULATIVE_OFFSET
+	DISPLAY_OFFSET 
+	DISPLAY_CUMULATIVE_OFFSET
 	DISPLAY_ZERO_SIZE_RANGE_WARNING
 	DISPLAY_ZERO_SIZE_RANGE 
 	DISPLAY_RANGE_NAME
@@ -452,6 +487,8 @@ Readonly my $NEW_ARGUMENTS =>
 	DISPLAY_HEX_DUMP
 	DISPLAY_DEC_DUMP
 	DISPLAY_USER_INFORMATION
+	DISPLAY_BITFIELDS
+	DISPLAY_BITFIELD_SOURCE
 	COLOR_NAMES 
 	ORIENTATION 
 	)] ;
@@ -499,6 +536,8 @@ Useful if you use Data::HexDump::Range in an application without terminal.
 
 =item * VERBOSE - Boolean - Display information about the creation of the object. Default is I<false>
 
+=item * DUMP_RANGE_DESCRIPTION - Boolean - Diplays the range descritption. A debugging flag.
+
 =item * FORMAT - String - format of the dump string generated by Data::HexDump::Range.
 
 Default is B<ANSI> which allows for colors. Other formats are 'ASCII' and 'HTML'.
@@ -538,6 +577,10 @@ in base 10. Default is 'hex'.
 =item * DISPLAY_HEX_DUMP - Boolean - If set, the hexadecimal dump column is displayed. Default is I<true>
 
 =item * DISPLAY_DEC_DUMP - Boolean - If set, the decimall dump column is displayed. Default is I<false>
+
+=item * DISPLAY_BITFIELD_SOURCE - Boolean - if set an extra column indicataing the source of bitfields is displayed
+
+=item * DISPLAY_BITFIELDS - Boolean - if set the bitfields are displayed
 
 =item * COLOR_NAMES - A hash reference
 
@@ -613,9 +656,10 @@ $self->CheckOptionNames($NEW_ARGUMENTS, @setup_data) ;
 	%{$self},
 	
 	VERBOSE => 0,
-
+	DUMP_RANGE_DESCRIPTION => 0,
+	
 	FORMAT => 'ANSI',
-	COLOR => 'bw',
+	COLOR => 'cycle',
 	COLORS =>
 		{
 		ASCII => [],
@@ -643,6 +687,9 @@ $self->CheckOptionNames($NEW_ARGUMENTS, @setup_data) ;
 	DISPLAY_ASCII_DUMP => 1,
 	DISPLAY_USER_INFORMATION => 0,
 
+	DISPLAY_BITFIELDS => 1,
+	DISPLAY_BITFIELD_SOURCE => 1,
+	
 	COLOR_NAMES => 
 		{
 		HTML =>
@@ -651,7 +698,7 @@ $self->CheckOptionNames($NEW_ARGUMENTS, @setup_data) ;
 			green => "style='color:#0f0;'",
 			bright_yellow => "style='color:#ff0;'",
 			yellow => "style='color:#ff0;'",
-			cyan => "style='color:#f0f;'",
+			cyan => "style='color:#0ff;'",
 			red => "style='color:#f00;'",
 			},
 		},
@@ -672,10 +719,22 @@ if($self->{VERBOSE})
 $self->{OFFSET_FORMAT} = $self->{OFFSET_FORMAT} =~ /^hex/ ? "%08x" : "%010d" ;
 $self->{MAXIMUM_RANGE_NAME_SIZE} = 2 if$self->{MAXIMUM_RANGE_NAME_SIZE} <= 2 ;
 
-$self->{FIELDS_TO_DISPLAY} =  $self->{ORIENTATION} =~ /^hor/
-	? [qw(OFFSET HEX_DUMP DEC_DUMP ASCII_DUMP RANGE_NAME)]
-	: [qw(RANGE_NAME OFFSET CUMULATIVE_OFFSET HEX_DUMP DEC_DUMP ASCII_DUMP USER_INFORMATION)] ;
+if($self->{ORIENTATION} =~ /^hor/)
+	{
+	my @fields = qw(OFFSET) ;
+	push @fields, 'BITFIELD_SOURCE' if $self->{DISPLAY_BITFIELD_SOURCE} ;
+	push @fields, qw( HEX_DUMP DEC_DUMP ASCII_DUMP RANGE_NAME) ;
+	
+	$self->{FIELDS_TO_DISPLAY} =  \@fields ;
+	}
+else
+	{
+	$self->{FIELDS_TO_DISPLAY} =  
+		 [qw(RANGE_NAME OFFSET CUMULATIVE_OFFSET HEX_DUMP DEC_DUMP ASCII_DUMP USER_INFORMATION)] ;
+	}
 
+my (undef, undef, $colorizer) = get_colorizer_data($self->{FORMAT}) ; # verify validity
+$self->{INTERACTION}{DIE}("Error: Invalid output format '$self->{FORMAT}'.\n") unless defined $colorizer ;
 
 return(1) ;
 }
@@ -718,7 +777,11 @@ for my $option_name (keys %options)
 	{
 	unless(exists $valid_options->{$option_name})
 		{
-		$self->{INTERACTION}{DIE}->("$self->{NAME}: Invalid Option '$option_name' at '$self->{FILE}:$self->{LINE}'!")  ;
+		$self->{INTERACTION}{DIE}->
+				(
+				"$self->{NAME}: Invalid Option '$option_name' at '$self->{FILE}:$self->{LINE}'\nValid options:\n\t"
+				.  join("\n\t", sort keys %{$valid_options}) . "\n"
+				);
 		}
 	}
 
@@ -853,113 +916,6 @@ return $self->format($split_data) ;
 
 #-------------------------------------------------------------------------------
 
-sub add_information
-{
-
-=head2 [P] add_information($split_data)
-
-Add information, according to the options passed to the constructor, to the internal data.
-
-I<Arguments> - See L<gather>
-
-=over 2
-
-=item * $split_data - data returned by _gather()
-
-=back
-
-I<Returns> - Nothing
-
-I<Exceptions> - None
-
-=cut
-
-my ($self, $split_data) = @_ ;
-
-my @information ;
-
-if($self->{DISPLAY_COLUMN_NAMES})
-	{
-	my $information = '' ;
-	
-	for my $field_name (@{$self->{FIELDS_TO_DISPLAY}})
-		{
-		if(exists $split_data->[0]{$field_name})
-			{
-			my $length = 0 ;
-			
-			for (@{$split_data->[0]{$field_name}})
-				{
-				$length += length($_->{$field_name}) ;
-				}
-				
-			$information .= sprintf "%-${length}.${length}s ", $field_name
-			}
-		}
-		
-	push @information,
-		{
-		INFORMATION => [ {INFORMATION => $information} ], 
-		NEW_LINE => 1,
-		} ;
-	}
-
-if($self->{DISPLAY_RULER})
-	{
-	my $information = '' ;
-	
-	for my $field_name (@{$self->{FIELDS_TO_DISPLAY}})
-		{
-		if(exists $split_data->[0]{$field_name})
-			{
-			my $length = 0 ;
-			
-			for (@{$split_data->[0]{$field_name}})
-				{
-				$length += length($_->{$field_name}) ;
-				}
-				
-			for ($field_name)
-				{
-				/HEX_DUMP/ and do
-					{
-					$information .= join '', map {sprintf '%x  ' , $ _ % 16} (0 .. $self->{DATA_WIDTH} - 1) ;
-					$information .= ' ' ;
-					last ;
-					} ;
-					
-				/DEC_DUMP/ and do
-					{
-					$information .= join '', map {sprintf '%d   ' , $ _ % 10} (0 .. $self->{DATA_WIDTH} - 1) ;
-					$information .= ' ' ;
-					last ;
-					} ;
-					
-				/ASCII_DUMP/ and do
-					{
-					$information .= join '', map {$ _ % 10} (0 .. $self->{DATA_WIDTH} - 1) ;
-					$information .= ' ' ;
-					last ;
-					} ;
-					
-				$information .= ' ' x $length  . ' ' ;
-				}
-			}
-		}
-		
-	push @information,
-		{
-		RULER => [ {RULER=> $information} ], 
-		NEW_LINE => 1,
-		} ;
-	}
-	
-unshift @{$split_data}, @information ;
-
-}
-
-#-------------------------------------------------------------------------------
-
 sub get_dump_and_consumed_data_size
 {
 
@@ -1016,847 +972,6 @@ my ($self) = @_ ;
 $self->{GATHERED} = [] ;
 
 return ;
-}
-
-#-------------------------------------------------------------------------------
-
-sub _gather
-{
-
-=head2 [P] _gather($range_description, $data, $offset, $size)
-
-Creates an internal data structure from the data to dump.
-
-  $hdr->_gather($container, $range_description, $data, $size)
-
-I<Arguments> - See L<gather>
-
-=over 2 
-
-=item * $container - an array reference or undef - where the gathered data 
-
-=item * $range_description - See L<gather> 
-
-=item * $data - See L<gather>
-
-=item * $offset - See L<gather>
-
-=item * $size - See L<gather>
-
-=back
-
-I<Returns> - 
-
-=over 2 
-
-=item * $container - the gathered data 
-
-=item * $used_data - integer - the location in the data where the dumping ended
-
-=back
-
-I<Exceptions> dies if passed invalid parameters
-
-=cut
-
-my ($self, $collected_data, $range_description, $data, $offset, $size) = @_ ;
-
-my $range_provider ;
-
-if('CODE' eq ref($range_description))
-	{
-	$range_provider = $range_description ;
-	}
-else
-	{
-	my $ranges = $self->create_ranges($range_description) ;
-	
-	$range_provider = 
-		sub
-		{
-		while(@{$ranges})
-			{
-			return shift @{$ranges} ;
-			}
-		}
-	}
-
-my $used_data = $offset || 0 ;
-
-if($used_data < 0)
-	{
-	my $location = "$self->{FILE}:$self->{LINE}" ;
-	$self->{INTERACTION}{DIE}("Warning: Invalid negative offset at '$location'.\n")
-	}
-
-$size = defined $size ? min($size, length($data) - $used_data) : length($data) - $used_data ;
-
-my $location = "$self->{FILE}:$self->{LINE}" ;
-my $skip_ranges = 0 ;
-
-my $last_data = '' ;
-
-while(my $range  = $range_provider->($data, $used_data))
-	{
-	my ($range_name, $range_size, $range_color, $range_user_information) = @{$range} ;
-	my $is_comment = 0 ;
-	my $is_bitfield = 0 ;
-	
-	my $range_size_definition = $range_size ; # needed for comment and bitfield
-	
-	#~ use Data::TreeDumper ;
-	#~ print DumpTree $range ;
-	
-	my $unpack_format = '#' ;
-
-	if('' eq ref($range_size))
-		{
-		if('#' eq  $range_size)
-			{
-			$is_comment++ ;
-			$range_size = 0 ;
-			$unpack_format = '#' ;
-			}
-		elsif($range_size =~ 'b')
-			{
-			$is_bitfield++ ;
-			$range_size = 0 ;
-			$unpack_format = '#' ;
-			}
-		elsif(looks_like_number($range_size))
-			{
-			# OK
-			$unpack_format = "x$used_data a$range_size"  ;
-			}
-		else
-			{
-			$self->{INTERACTION}{DIE}("Error: size '$range_size' doesn't look like a number in range '$range_name' at '$location'.\n")
-			}
-		}
-	#todo: check it is a sub
-	
-	my @sub_or_scalar ;
-	
-	push @sub_or_scalar, ref($range_name) eq 'CODE' ? $range_name->($data, $used_data, $size)  : $range_name ;
-	push @sub_or_scalar, ref($range_size) eq 'CODE' ? $range_size->($data, $used_data, $size)  : $range_size ;
-	push @sub_or_scalar, ref($range_color) eq 'CODE' ? $range_color->($data, $used_data, $size)  : $range_color;
-	
-	($range_name, $range_size, $range_color) = @sub_or_scalar ;
-	
-	if($self->{DISPLAY_RANGE_SIZE})
-		{
-		unless($is_comment || $is_bitfield)
-			{
-			$range_name = $range_size . ':' . $range_name ;
-			}
-		}
-		
-	#todo: merge bith tests qbove qnd below
-	#
-	if(!$is_comment && ! $is_bitfield)
-		{
-		if($range_size == 0 && $self->{DISPLAY_ZERO_SIZE_RANGE_WARNING}) 
-			{
-			$self->{INTERACTION}{WARN}("Warning: range '$range_name' requires zero bytes.\n") ;
-			}
-		}
-		
-	if($range_size > $size)
-		{
-		my $location = "$self->{FILE}:$self->{LINE}" ;
-		$self->{INTERACTION}{WARN}("Warning: not enough data for range '$range_name', $range_size needed but only $size available.\n") ;
-		
-		$range_name = '-' . ($range_size - $size)  . ':' . $range_name ;
-		
-		$range_size = $size;
-		$skip_ranges++ ;
-		}
-
-	$last_data = unpack($unpack_format, $data) unless $unpack_format eq '#' ; # get out data from the previous range for bitfield
-
-	push @{$collected_data}, 		
-		{
-		NAME => $range_name, 
-		COLOR => $range_color,
-		OFFSET => $used_data,
-		DATA =>  $last_data,
-		IS_BITFIELD => $is_bitfield ? $range_size_definition : 0,
-		USER_INFORMATION => $range_user_information,
-		} ;
-	
-	$used_data += $range_size ;
-	$size -= $range_size ;
-	
-	last if $skip_ranges ;
-	}
-
-return $collected_data, $used_data ;
-}
-
-#-------------------------------------------------------------------------------
-
-sub create_ranges
-{
-
-=head2 [P] create_ranges($range_description)
-
-transforms the user supplied ranges into an internal format
-
-I<Arguments> - 
-
-=over 2 
-
-=item * $range_description - See L<gather> 
-
-=back
-
-I<Returns> - Nothing
-
-I<Exceptions> - Croaks with an error messge if the input data is invalid
-
-=cut
-
-my ($self, $range_description) = @_ ;
-
-return $self->create_ranges_from_array_ref($range_description) if 'ARRAY' eq ref($range_description) ;
-return $self->create_ranges_from_string($range_description) if '' eq ref($range_description) ;
-
-}
-
-#-------------------------------------------------------------------------------
-
-sub create_ranges_from_string
-{
-
-=head2 [P] create_ranges_from_string($range_description)
-
-transforms the user supplied ranges into an internal format
-
-I<Arguments> - 
-
-=over 2 
-
-=item * $range_description - A string - See L<gather> 
-
-=back
-
-I<Returns> - Nothing
-
-I<Exceptions> - Croaks with an error messge if the input data is invalid
-
-=cut
-
-my ($self, $range_description) = @_ ;
-
-# 'comment,#:name,size,color:name,size:name,size,color'
-
-my @ranges = 
-	map
-	{
-		[ map {s/^\s+// ; s/\s+$//; $_} split /,/ ] ;
-	} split /:/, $range_description ;
-
-my @flattened = $self->flatten(\@ranges) ;
-@ranges = () ;
-
-while(@flattened)
-	{
-	push @ranges, [splice(@flattened, 0, $RANGE_DEFINITON_FIELDS)] ;
-	}
-
-return \@ranges ;
-}
-
-
-sub create_ranges_from_array_ref
-{
-
-=head2 [P] create_ranges_from_array_ref($range_description)
-
-transforms the user supplied ranges into an internal format
-
-I<Arguments> - 
-
-=over 2 
-
-=item * $range_description - An array reference - See L<gather> 
-
-=back
-
-I<Returns> - Nothing
-
-I<Exceptions> - Croaks with an error messge if the input data is invalid
-
-=cut
-
-my ($self, $range_description) = @_ ;
-
-my @flattened = $self->flatten($range_description) ;
-
-my @ranges ;
-
-while(@flattened)
-	{
-	push @ranges, [splice(@flattened, 0, $RANGE_DEFINITON_FIELDS)] ;
-	}
-	
-return \@ranges ;
-}
-
-#-------------------------------------------------------------------------------
-
-sub flatten 
-{ 
-	
-=head2 [P] flatten($range_description)
-
-transforms the user supplied ranges into an internal format
-
-I<Arguments> - 
-
-=over 2 
-
-=item * $range_description - See L<gather> 
-
-=back
-
-I<Returns> - Nothing
-
-I<Exceptions> - Croaks with an error messge if the input data is invalid
-
-=cut
-
-my $self = shift ;
-
-map 
-	{
-	my  $description = $_ ;
-	
-	if(ref($description) eq 'ARRAY')
-		{
-		if(all {'' eq ref($_) || 'CODE' eq ref($_) } @{$description} ) # todo: handle code refs
-			{
-			my $location = "$self->{FILE}:$self->{LINE}" ;
-			
-			# a simple  range description, color is  optional
-			if(@{$description} == 0)
-				{
-				$self->{INTERACTION}{DIE}->
-					(
-					"Error: too few elements in range description [" 
-					. join(', ', map {defined $_ ? $_ : 'undef'} @{$description})  
-					. "] at '$location'." 
-					) ;
-				}
-			elsif(@{$description} == 1)
-				{
-				if('' eq ref($description->[0]))
-					{
-					$self->{INTERACTION}{DIE}->
-						(
-						"Error: too few elements in range description [" 
-						. join(', ', map {defined $_ ? $_ : 'undef'} @{$description})  
-						. "] at '$location'." 
-						) ;
-					}
-				else
-					{
-					@{$description} = $description->[0]() ;
-					
-					$self->{INTERACTION}{DIE}->
-						(
-						"Error: single sub range definition returned ["
-						. join(', ', map {defined $_ ? $_ : 'undef'}@{$description})  
-						. "] at '$location'." 
-						) 
-						unless (@{$description} == 3) ;
-					}
-				}
-			elsif(@{$description} == 2)
-		        	{
-				push @{$description}, undef, undef ;
-				}
-			elsif(@{$description} == 3)
-				{
-				push @{$description}, undef ;
-				}
-			elsif(@{$description} > $RANGE_DEFINITON_FIELDS)
-				{
-				$self->{INTERACTION}{DIE}->
-					(
-					"Error: too many elements in range description [" 
-					. join(', ', map {defined $_ ? $_ : 'undef'} @{$description}) 
-					. "] at '$location'." 
-					) ;
-				}
-				
-			@{$description} ;
-			}
-		else
-			{
-			$self->flatten(@{$description}) ;
-			}
-		}
-	else
-		{
-		$description
-		}
-	} @_ 
-}
-
-#-------------------------------------------------------------------------------
-
-sub split
-{
-
-=head2 [P] split($collected_data)
-
-Split the collected data into lines
-
-I<Arguments> - 
-
-=over 2 
-
-=item * $container - Collected data
-
-=back
-
-I<Returns> - Nothing
-
-I<Exceptions>
-
-=cut
-
-my ($self, $collected_data) = @_ ;
-
-#~ use Data::TreeDumper ;
-#~ print DumpTree $collected_data ;
-
-my @lines ;
-my $line = {} ;
-my $current_offset = 0 ;
-
-my $room_left = $self->{DATA_WIDTH} ;
-my $total_dumped_data = 0 ;
-my $max_range_name_size = $self->{MAXIMUM_RANGE_NAME_SIZE} ;
-
-my @found_bitfields ;
-
-for my $data (@{$collected_data})
-	{
-	my $data_length = defined $data->{DATA} ? length($data->{DATA}) : 0 ;
-	my $is_comment = ! defined $data->{DATA} ;
-	my ($start_quote, $end_quote) = $is_comment ? ('"', '"') : ('<', '>') ;
-	
-	$data->{COLOR} = $self->get_default_color()  unless defined $data->{COLOR} ;
-	
-	if($self->{ORIENTATION} =~ /^hor/)
-		{
-		my $last_data = $data == $collected_data->[-1] ? 1 : 0 ;
-		my $dumped_data = 0 ;
-		my $data_length = defined $data->{DATA} ? length($data->{DATA}) : 0 ;
-		
-		if(0 == $data_length && $self->{DISPLAY_ZERO_SIZE_RANGE} && $self->{DISPLAY_RANGE_NAME})
-			{
-			my $name_size_quoted = $max_range_name_size - 2 ;
-			$name_size_quoted =  2 if $name_size_quoted < 2 ;
-			
-			push @{$line->{RANGE_NAME}},
-				{
-				'RANGE_NAME' => $start_quote . sprintf("%.${name_size_quoted}s", $data->{NAME}) . $end_quote,
-				'RANGE_NAME_COLOR' => $data->{COLOR},
-				},
-				{
-				'RANGE_NAME_COLOR' => undef,
-				'RANGE_NAME' => ', ',
-				} ;
-			}
-		
-		while ($dumped_data < $data_length)
-			{
-			my $size_to_dump = min($room_left, length($data->{DATA}) - $dumped_data) ;
-			$room_left -= $size_to_dump ;
-			
-			for my  $field_type 
-				(
-				['OFFSET', sub {exists $line->{OFFSET} ? '' : sprintf $self->{OFFSET_FORMAT}, $current_offset}, undef, 0],
-				['HEX_DUMP', sub {sprintf '%02x ' x $size_to_dump, @_}, $data->{COLOR}, 3],
-				['DEC_DUMP', sub {sprintf '%03u ' x $size_to_dump, @_}, $data->{COLOR}, 4],
-				['ASCII_DUMP', sub {sprintf '%c' x $size_to_dump, map{$_ < 30 ? ord('.') : $_ } @_}, $data->{COLOR}, 1],
-				['RANGE_NAME',sub {sprintf "%.${max_range_name_size}s", $data->{NAME}}, $data->{COLOR}, 0],
-				['RANGE_NAME', sub {', '}, undef, 0],
-				)
-				{
-				my ($field_name, $field_data_formater, $color, $pad_size) = @{$field_type} ;
-				
-				if($self->{"DISPLAY_$field_name"})
-					{
-					#todo: move unpack out of the loop
-					#todo: pass object as argument to sub
-					my $field_text = $field_data_formater->(unpack("x$dumped_data C$size_to_dump", $data->{DATA})) ;
-					
-					my $pad = $last_data 
-							? $pad_size 
-								? ' ' x ($room_left * $pad_size) 
-								: '' 
-							: '' ;
-							
-					push @{$line->{$field_name}},
-						{
-						$field_name . '_COLOR' => $color,
-						$field_name => $field_text . $pad,
-						} ;
-					}
-				}
-				
-			$dumped_data += $size_to_dump ;
-			$current_offset += $self->{DATA_WIDTH} ;
-			
-			if($data->{IS_BITFIELD} && ! $data->{BITFIELD_DISPLAYED})
-				{
-				push @found_bitfields, $self->get_bitfield_lines($data) ;
-				$data->{BITFIELD_DISPLAYED}++ ;
-				}
-			
-			if($room_left == 0 || $last_data)
-				{
-				$line->{NEW_LINE}++ ;
-				push @lines, $line ;
-				
-				if(@found_bitfields)
-					{
-					push @lines, {NEW_LINE => 1}, @found_bitfields, {NEW_LINE => 1} ;
-					@found_bitfields = () ;
-					}
-					
-				$line = {} ;
-				$room_left = $self->{DATA_WIDTH} ;
-				}
-			}
-		}
-	else
-		{ 
-		# vertical mode
-			
-		$line = {} ;
-
-		my $dumped_data = 0 ;
-		my $current_range = '' ;
-		
-		if(0 == $data_length && $self->{DISPLAY_ZERO_SIZE_RANGE} && $self->{DISPLAY_RANGE_NAME})
-			{
-			push @{$line->{RANGE_NAME}},
-				{
-				'RANGE_NAME_COLOR' => $data->{COLOR},
-				'RANGE_NAME' => "$start_quote$data->{NAME}$end_quote",
-				} ;
-				
-			$line->{NEW_LINE} ++ ;
-			push @lines, $line ;
-			$line = {};
-			}
-			
-		while ($dumped_data < $data_length)
-			{ 
-			last if($data->{IS_BITFIELD}) ;
-
-			my $size_to_dump = min($self->{DATA_WIDTH}, length($data->{DATA}) - $dumped_data) ;
-			my @range_data = unpack("x$dumped_data C$size_to_dump", $data->{DATA}) ;
-			
-			for my  $field_type 
-				(
-				['RANGE_NAME',  sub {sprintf "%-${max_range_name_size}.${max_range_name_size}s", $data->{NAME} ; }, $data->{COLOR}, $max_range_name_size] ,
-				['OFFSET', sub {sprintf $self->{OFFSET_FORMAT}, $total_dumped_data ;}, undef, 8],
-				['CUMULATIVE_OFFSET', sub {sprintf $self->{OFFSET_FORMAT}, $dumped_data}, undef, 8],
-				['HEX_DUMP', sub {sprintf '%02x ' x $size_to_dump, @{$_[0]}}, $data->{COLOR}, 3 * $self->{DATA_WIDTH}],
-				['DEC_DUMP', sub {sprintf '%03u ' x $size_to_dump, @{ $_[0] }}, $data->{COLOR}, 4 * $self->{DATA_WIDTH}],
-				['ASCII_DUMP', sub {sprintf '%c' x $size_to_dump, map{$_ < 30 ? ord('.') : $_ } @{$_[0]}}, $data->{COLOR}, $self->{DATA_WIDTH}],
-                                ['USER_INFORMATION', sub { sprintf '%-20.20s', $data->{USER_INFORMATION} || ''}, $data->{COLOR}, 20],
-				)
-				{
-				
-				my ($field_name, $field_data_formater, $color, $field_text_size) = @{$field_type} ;
-				
-				if($self->{"DISPLAY_$field_name"})
-					{
-					my $field_text = $field_data_formater->(\@range_data) ;
-					my $pad = ' ' x ($field_text_size -  length($field_text)) ;
-					
-					push @{$line->{$field_name}},
-						{
-						$field_name . '_COLOR' => $color,
-						$field_name =>  $field_text .  $pad,
-						} ;
-					}
-				}
-				
-			$dumped_data += $size_to_dump ;
-			$total_dumped_data += $size_to_dump ;
-			
-			$line->{NEW_LINE} ++ ;
-			push @lines, $line ;
-			$line = {};
-			}
-			
-		push @lines, $self->get_bitfield_lines($data) if($data->{IS_BITFIELD}) ;
-		}
-	}
-
-return \@lines ;
-}
-
-sub get_bitfield_lines
-{
-
-my ($self, $data) = @_ ;
-
-my $max_range_name_size = $self->{MAXIMUM_RANGE_NAME_SIZE} ;
-
-my @lines ;
-
-for my $bitfield_description ($data)
-	{
-	#todo: handle 'x' outside of string in unpack
-	#todo: handle bitfield without data
-	
-	#~ my @bitfield_data = unpack("$bitfield_description->{IS_BITFIELD}", $bitfield_description->{DATA}) ;
-
-	my ($offset, $size) = $bitfield_description->{IS_BITFIELD} =~ m/x?(.*)b(.*)/ ;
-
-	$offset ||= 0 ;
-	$size ||= 1 ;
-
-	my $line = {};
-
-	for my  $field_type 
-		(
-		['RANGE_NAME',  sub {sprintf "%-${max_range_name_size}.${max_range_name_size}s", '.' . $_[0]->{NAME} ; }, undef, $max_range_name_size ] ,
-		['OFFSET', sub {sprintf '%02u .. %02u', $offset, ($offset + $size) - 1}, undef, 8],
-		['CUMULATIVE_OFFSET', sub {''}, undef, 8],
-		['HEX_DUMP', 
-			sub 
-			{
-			my @binary = split '', unpack("B*",  $_[0]->{DATA}) ;
-			splice(@binary, 0, $offset) ;
-			splice(@binary, $size) ;
-			my $binary = join('', @binary) ;
-			
-			my $value = unpack("N", pack("B32", substr("0" x 32 . $binary, -32)));
-
-			my $binary_dashed = '-' x $offset . $binary . '-' x (32 - ($size + $offset)) ;
-			my $bytes = $size > 24 ? 4 : $size > 16 ? 3 : $size > 8 ? 2 : 1 ;
-			
-			my @bytes = unpack("(H2)*", pack("B32", substr("0" x 32 . $binary, -32)));
-			
-			my $number_of_bytes = @binary > 24 ? 4 : @binary > 16 ? 3 : @binary > 8 ? 2 : 1 ;
-			splice @bytes, 0 , (4 - $number_of_bytes), map {'--'} 1 .. (4 - $number_of_bytes) ;
-			
-			join(' ', @bytes) . ' ' . $binary_dashed;
-			},
-			
-			undef, 3 * $self->{DATA_WIDTH}],
-		['DEC_DUMP', 
-			sub 
-			{
-			my @binary = split '', unpack("B*",  $_[0]->{DATA}) ;
-			splice(@binary, 0, $offset) ;
-			splice(@binary, $size) ;
-			my $binary = join('', @binary) ;
-			my $value = unpack("N", pack("B32", substr("0" x 32 . $binary, -32)));
-			
-			my @values = map {sprintf '%03u', $_} unpack("W*", pack("B32", substr("0" x 32 . $binary, -32)));
-			
-			my $number_of_bytes = @binary > 24 ? 4 : @binary > 16 ? 3 : @binary > 8 ? 2 : 1 ;
-			splice @values, 0 , (4 - $number_of_bytes), map {'---'} 1 .. (4 - $number_of_bytes) ;
-			
-			join(' ',  @values) . ' ' . "value: $value"  ;
-			},
-			
-			$bitfield_description->{COLOR}, 4 * $self->{DATA_WIDTH}],
-			
-		['ASCII_DUMP',
-			sub 
-			{
-			my @binary = split '', unpack("B*",  $_[0]->{DATA}) ;
-			splice(@binary, 0, $offset) ;
-			splice(@binary, $size) ;
-			my $binary = join('', @binary) ;
-			
-			my @chars = map{$_ < 30 ? '.' : chr($_) } unpack("C*", pack("B32", substr("0" x 32 . $binary, -32)));
-			
-			my $number_of_bytes = @binary > 24 ? 4 : @binary > 16 ? 3 : @binary > 8 ? 2 : 1 ;
-			splice @chars, 0 , (4 - $number_of_bytes), map {'-'} 1 .. (4 - $number_of_bytes) ;
-			
-			'.bitfield: '.  join('',  @chars) 
-			},
-
-			undef, $self->{DATA_WIDTH}],
-		)
-		{
-		my ($field_name, $field_data_formater, $color, $field_text_size) = @{$field_type} ;
-		
-		$color = $bitfield_description->{COLOR} ;
-		
-		if($self->{"DISPLAY_$field_name"})
-			{
-			my $field_text = $field_data_formater->($bitfield_description) ;
-			my $pad_size = $field_text_size -  length($field_text) ;
-			
-			push @{$line->{$field_name}},
-				{
-				$field_name . '_COLOR' => $color,
-				$field_name =>  $field_text . ' ' x $pad_size,
-				} ;
-				
-			}
-		}
-	
-	$line->{NEW_LINE} ++ ;
-	push @lines, $line ;
-	}
-	
-return @lines ;
-}
-#-------------------------------------------------------------------------------
-
-my $current_color_index = 0 ;
-
-sub get_default_color
-{
-
-=head2 [P] get_default_color()
-
-Returns a color to use with a range that has none
-
-  my $default_color = $self->get_default_color() ;
-
-I<Arguments> - None
-
-I<Returns> - A string - a color according to the COLOR option and FORMAT
-
-I<Exceptions> - None
-
-=cut
-
-my ($self) = @_ ;
-
-my $default_color ;
-
-if($self->{COLOR} eq 'bw')
-	{
-	$default_color = $self->{COLORS}{$self->{FORMAT}}[0] ;
-	}
-else
-	{
-	$current_color_index++ ;
-	$current_color_index = 0 if $current_color_index >= @{$self->{COLORS}{$self->{FORMAT}}} ;
-	
-	$default_color = $self->{COLORS}{$self->{FORMAT}}[$current_color_index] ;
-	}
-	
-return $default_color ;
-}
-
-sub format
-{
-	
-=head2 [P] format($line_data)
-
-Transform the line data into ANSI, ASCII or HTML
-
-I<Arguments> -
-
-=over 2 
-
-=item * \%line_data - See L<gather> 
-
-=back
-
-I<Returns> - A dump in ANSI, ASCII or HTML.
-
-=cut
-
-my ($self, $line_data) = @_ ;
-
-#~ use Data::TreeDumper ;
-#~ print DumpTree $line_data ;
-
-my $formated = '' ;
-
-my @fields = @{$self->{FIELDS_TO_DISPLAY}} ;
-unshift @fields, 'INFORMATION', 'RULER' ;
-
-
-for ($self->{FORMAT})
-	{
-	/ASCII/ || /ANSI/ and do
-		{
-		my $colorizer = /ASCII/ ? sub {$_[0]} : \&colored ;
-		
-		for my $line (@{$line_data})
-			{
-			for my $field (@fields)
-				{
-				if(exists $line->{$field})
-					{
-					for my $range (@{$line->{$field}})
-						{
-						my $user_color = (defined $self->{COLOR_NAMES} &&  defined $range->{"${field}_COLOR"})
-										? $self->{COLOR_NAMES} {$self->{FORMAT}}{$range->{"${field}_COLOR"}}  ||  $range->{"${field}_COLOR"}
-										: $range->{"${field}_COLOR"} ;
-						
-						if(defined $user_color && $user_color ne '')
-							{
-							$formated .= $colorizer->($range->{$field}, $user_color) ;
-							}
-						else
-							{
-							$formated .= $range->{$field} ;
-							}
-						}
-						
-					$formated .= ' '
-					}
-				}
-				
-			$formated .= "\n" if $line->{NEW_LINE} ;
-			}
-		} ;
-		
-	/HTML/ and do
-		{
-		$formated = <<'EOH' ;
-<pre style ="font-family: monospace; background-color: #000 ;">
-
-EOH
-		for my $line (@{$line_data})
-			{
-			for my $field (@fields)
-				{
-				if(exists $line->{$field})
-					{
-					for my $range (@{$line->{$field}})
-						{
-						my $user_color = (defined $self->{COLOR_NAMES} &&  defined $range->{"${field}_COLOR"})
-										? $self->{COLOR_NAMES} {$self->{FORMAT}}{$range->{"${field}_COLOR"}}  ||  $range->{"${field}_COLOR"}
-										: $range->{"${field}_COLOR"} ;
-						
-						$user_color = "style='color:#fff;'" unless defined $user_color ;
-						$formated .= "<span $user_color>" . $range->{$field} . "</span>" ;
-						}
-						
-					$formated .= ' ' ;
-					}
-				}
-				
-			$formated .= "\n" if $line->{NEW_LINE} ;
-			}
-		
-		$formated .= "\n</pre>\n" ;
-		} ;
-	}
-	
-return $formated ;
 }
 
 #-------------------------------------------------------------------------------

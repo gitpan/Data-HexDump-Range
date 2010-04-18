@@ -9,6 +9,9 @@ my @split_modules ;
 
 my @pm_files = qw(
 lib/Data/HexDump//Range.pm
+lib/Data/HexDump/Range/Gather.pm
+lib/Data/HexDump/Range/Split.pm
+lib/Data/HexDump/Range/Format.pm
 );
 
 for(@pm_files)
@@ -149,6 +152,7 @@ my $build = $class->new
 		'List::Util' => 0,
 		'List::MoreUtils' => 0,
 		'Scalar::Util' => 0,
+		'Data::TreeDumper' => 0,
 		},
 		
 	pm_files     => \%all_modules,
