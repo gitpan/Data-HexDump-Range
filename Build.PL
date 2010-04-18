@@ -12,6 +12,7 @@ lib/Data/HexDump//Range.pm
 lib/Data/HexDump/Range/Gather.pm
 lib/Data/HexDump/Range/Split.pm
 lib/Data/HexDump/Range/Format.pm
+lib/Data/HexDump/Range/Object.pm
 );
 
 for(@pm_files)
@@ -153,6 +154,7 @@ my $build = $class->new
 		'List::MoreUtils' => 0,
 		'Scalar::Util' => 0,
 		'Data::TreeDumper' => 0,
+		'Term::Bash::Completion::Generator' => 0,
 		},
 		
 	pm_files     => \%all_modules,

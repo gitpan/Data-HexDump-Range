@@ -1,4 +1,27 @@
-commit 8809c8e84eb323bbaa3669e948b685026c35fa59 (HEAD, master)
+commit 7f54546a6c6a5ba062aec8928cdead2e734d4ba0 (HEAD, master)
+Author: nadim khemir <nkh@cpan.org>
+Date:   Mon Apr 19 00:11:50 2010 +0200
+
+    ADDED: bash completion script generation
+    FIXED: string definition 'name,7,,comment' forced grey as color
+    ADDED: user comments to bitfields
+    CHANGED: unified option names
+
+commit fc395bf4275e414537019cc1479408727219ab69
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sun Apr 18 23:06:59 2010 +0200
+
+    ADDED: display user info for bitfields
+    FIXED: defining user info without color used grey color
+    FIXED: proper check of bitfield size definition
+
+commit 251ba85fa909c8a2a5cc9383f1ae768047a14388
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sun Apr 18 11:40:31 2010 +0200
+
+    CHANGES: move object creation to own module
+
+commit 8809c8e84eb323bbaa3669e948b685026c35fa59
 Author: nadim khemir <nkh@cpan.org>
 Date:   Sun Apr 18 03:32:03 2010 +0200
 
