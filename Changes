@@ -1,4 +1,12 @@
-commit 7f54546a6c6a5ba062aec8928cdead2e734d4ba0 (HEAD, master)
+commit 199a4b127b29f91d2e63f95f8c40bde19ba138c4 (HEAD, master)
+Author: nadim khemir <nkh@cpan.org>
+Date:   Tue Apr 20 01:06:03 2010 +0200
+
+    FIXED: maximum_size applied within a range
+    FIXED:bitfield displayed one line too late when range last offset == data_width
+    ADDED: truncated ranges (max_size) have their bitfields displayed
+
+commit 7f54546a6c6a5ba062aec8928cdead2e734d4ba0
 Author: nadim khemir <nkh@cpan.org>
 Date:   Mon Apr 19 00:11:50 2010 +0200
 
