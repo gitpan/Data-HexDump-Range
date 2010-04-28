@@ -1,5 +1,5 @@
 
-package Data::HexDump::Range ;
+package Data::HexDump::Range ; ## no critic (Modules::RequireFilenameMatchesPackage)
 
 use strict;
 use warnings ;
@@ -18,7 +18,6 @@ use Sub::Exporter -setup =>
 	};
 	
 use vars qw ($VERSION);
-$VERSION     = '0.01';
 }
 
 #-------------------------------------------------------------------------------
@@ -30,11 +29,19 @@ Readonly my $EMPTY_STRING => q{} ;
 
 use Carp qw(carp croak confess) ;
 
+use Text::Colorizer ;
+
 #-------------------------------------------------------------------------------
 
 =head1 NAME
 
 Data::HexDump::Range::Format - Handles formating for Data::HexDump::Range
+
+=head1 SYNOPSIS
+
+=head1 DESCRIPTION
+
+=head1 DOCUMENTATION
 
 =head1 SUBROUTINES/METHODS
 
@@ -43,8 +50,6 @@ Subroutines prefixed with B<[P]> are not part of the public API and shall not be
 =cut
 
 #-------------------------------------------------------------------------------
-
-my $current_color_index = 0 ;
 
 sub get_default_color
 {
@@ -73,16 +78,18 @@ if($self->{COLOR} eq 'bw')
 	}
 else
 	{
-	$current_color_index++ ;
-	$current_color_index = 0 if $current_color_index >= @{$self->{COLORS}{$self->{FORMAT}}} ;
+	$default_color = $self->{COLORS}{$self->{FORMAT}}[$self->{CURRENT_COLOR_INDEX}] ;
 	
-	$default_color = $self->{COLORS}{$self->{FORMAT}}[$current_color_index] ;
+	$self->{CURRENT_COLOR_INDEX}++ ;
+	$self->{CURRENT_COLOR_INDEX} = 0 if $self->{CURRENT_COLOR_INDEX} >= @{$self->{COLORS}{$self->{FORMAT}}} ;
 	}
 	
 return $default_color ;
 }
 
-sub format
+#-------------------------------------------------------------------------------
+
+sub format ## no critic (Subroutines::ProhibitBuiltinHomonyms)
 {
 	
 =head2 [P] format($line_data)
@@ -103,12 +110,16 @@ I<Returns> - A dump in ANSI, ASCII or HTML.
 
 my ($self, $line_data) = @_ ;
 
-#~ use Data::TreeDumper ;
-#~ print DumpTree $line_data ;
+my @colors ;
+push @colors, 'COLORS' => $self->{COLOR_NAMES} if defined $self->{COLOR_NAMES} ;
 
-my ($header, $footer, $colorizer) = get_colorizer_data($self->{FORMAT}) ;
+my $colorizer = Text::Colorizer->new
+				(
+				FORMAT => $self->{FORMAT},
+				@colors,
+				) ;
 
-my $formated = '' ;
+my @colored_lines ;
 
 my @fields = @{$self->{FIELDS_TO_DISPLAY}} ;
 unshift @fields, 'INFORMATION', 'RULER' ;
@@ -121,84 +132,20 @@ for my $line (@{$line_data})
 			{
 			for my $range (@{$line->{$field}})
 				{
-				my $user_color = (defined $self->{COLOR_NAMES} &&  defined $range->{"${field}_COLOR"})
-								? $self->{COLOR_NAMES} {$self->{FORMAT}}{$range->{"${field}_COLOR"}}  ||  $range->{"${field}_COLOR"}
-								: $range->{"${field}_COLOR"} ;
-				
-				$formated .= $colorizer->($range->{$field}, $user_color) ;
+				push @colored_lines, $range->{"${field}_COLOR"}, $range->{$field} ,
 				}
 				
-			$formated .= ' '
+			push @colored_lines, $EMPTY_STRING, q{ } ;
 			}
 		}
 		
-	$formated .= "\n" if $line->{NEW_LINE} ;
+	push @colored_lines, $EMPTY_STRING, "\n" if $line->{NEW_LINE} ;
 	}
 
-return $header . $formated . $footer ;
+return $colorizer->color(@colored_lines) ;
 }
 
 #-------------------------------------------------------------------------------
-
-sub get_colorizer_data
-{
-
-my ($format) = @_ ;
-my ($header, $footer, $colorizer)  = ('', '') ;
-
-for ($format)
-	{
-	/ASCII/ and do
-		{
-		$colorizer = sub {$_[0]} ;
-		last ;
-		} ;
-		
-	/ANSI/ and do
-		{
-		$colorizer = 
-			sub 
-			{
-			my ($text, $color) = @_ ;
-			
-			if(defined $color && $color ne '')
-				{
-				colored($text, $color) ;
-				}
-			else
-				{
-				$text ;
-				}
-			} ;
-			
-		last ;
-		} ;
-		
-	/HTML/ and do
-		{
-		$colorizer =
-			sub 
-			{
-			my ($text, $color) = @_ ;
-			
-			$color = "style='color:#fff;'" unless defined $color ;
-			
-			"<span $color>" . $text . "</span>" ;
-			} ;
-			
-		$header = <<'EOH' ;
-<pre style ="font-family: monospace; background-color: #000 ;">
-
-EOH
-
-		$footer .= "\n</pre>\n" ;
-		
-		last ;
-		} ;
-	}
-
-return ($header, $footer, $colorizer) ;
-}
 
 1 ;
 
@@ -212,9 +159,9 @@ None so far.
 	CPAN ID: NKH
 	mailto: nadim@cpan.org
 
-=head1 COPYRIGHT & LICENSE
+=head1 COPYRIGHT AND LICENSE
 
-Copyright 2010 Nadim Khemir.
+Copyright Nadim Khemir 2010.
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of either:

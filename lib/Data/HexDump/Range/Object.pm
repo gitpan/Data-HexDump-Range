@@ -1,5 +1,5 @@
 
-package Data::HexDump::Range ;
+package Data::HexDump::Range ; ## no critic (Modules::RequireFilenameMatchesPackage)
 
 use strict;
 use warnings ;
@@ -18,7 +18,6 @@ use Sub::Exporter -setup =>
 	};
 	
 use vars qw ($VERSION);
-$VERSION     = '0.06';
 }
 
 #-------------------------------------------------------------------------------
@@ -40,6 +39,8 @@ Data::HexDump::Range::Object - Hexadecial Range Dumper object creation support m
 
 The main goal of this module is to remove non public APIs from the module documentation
 
+=head1 DOCUMENTATION
+
 =head1 SUBROUTINES/METHODS
 
 Subroutines prefixed with B<[P]> are not part of the public API and shall not be used directly.
@@ -55,10 +56,13 @@ Readonly my $NEW_ARGUMENTS =>
 	NAME INTERACTION VERBOSE
 	
 	DUMP_RANGE_DESCRIPTION
+	GATHERED_CHUNK
 	
 	FORMAT 
 	COLOR 
+	START_COLOR
 	OFFSET_FORMAT 
+	OFFSET_START
 	DATA_WIDTH 
 	DISPLAY_COLUMN_NAMES
 	DISPLAY_RULER
@@ -75,6 +79,7 @@ Readonly my $NEW_ARGUMENTS =>
 	DISPLAY_USER_INFORMATION
 	DISPLAY_BITFIELDS
 	DISPLAY_BITFIELD_SOURCE
+	BIT_ZERO_ON_LEFT
 	COLOR_NAMES 
 	ORIENTATION 
 	)] ;
@@ -84,7 +89,7 @@ Readonly my $NEW_ARGUMENTS =>
 sub Setup
 {
 
-=head2 [P] Setup(...)
+=head2 [P] Setup()
 
 Helper sub called by new. This is a private sub.
 
@@ -114,15 +119,20 @@ $self->CheckOptionNames($NEW_ARGUMENTS, @setup_data) ;
 	DUMP_RANGE_DESCRIPTION => 0,
 	
 	FORMAT => 'ANSI',
+	
 	COLOR => 'cycle',
+	CURRENT_COLOR_INDEX => 0,
+	START_COLOR	=> undef,
 	COLORS =>
 		{
 		ASCII => [],
-		ANSI => ['white', 'green', 'bright_yellow','cyan', 'red' ],
-		HTML => ['white', 'green', 'bright_yellow','cyan', 'red' ],
+		ANSI => ['bright_green', 'bright_yellow','bright_cyan', 'bright_red', 'bright_white'],
+		HTML => ['bright_green', 'bright_yellow','bright_cyan', 'bright_red', 'bright_white' ],
 		},
 		
 	OFFSET_FORMAT => 'hex',
+	OFFSET_START => 0,
+	
 	DATA_WIDTH => 16,
 	
 	DISPLAY_ZERO_SIZE_RANGE_WARNING => 1,
@@ -142,27 +152,19 @@ $self->CheckOptionNames($NEW_ARGUMENTS, @setup_data) ;
 	DISPLAY_ASCII_DUMP => 1,
 	DISPLAY_USER_INFORMATION => 0,
 
-	DISPLAY_BITFIELDS => 1,
+	DISPLAY_BITFIELDS => undef,
 	DISPLAY_BITFIELD_SOURCE => 1,
+	BIT_ZERO_ON_LEFT => 0,
 	
-	COLOR_NAMES => 
-		{
-		HTML =>
-			{
-			white => "style='color:#fff;'",
-			green => "style='color:#0f0;'",
-			bright_yellow => "style='color:#ff0;'",
-			yellow => "style='color:#ff0;'",
-			cyan => "style='color:#0ff;'",
-			red => "style='color:#f00;'",
-			},
-		},
-
 	ORIENTATION => 'horizontal',
 	
 	GATHERED => [],
 	@setup_data,
 	) ;
+
+$self->{INTERACTION}{INFO} ||= sub {print @_} ;
+$self->{INTERACTION}{WARN} ||= \&Carp::carp ;
+$self->{INTERACTION}{DIE}  ||= \&Carp::croak ;
 
 my $location = "$self->{FILE}:$self->{LINE}" ;
 
@@ -171,11 +173,27 @@ if($self->{VERBOSE})
 	$self->{INTERACTION}{INFO}('Creating ' . ref($self) . " '$self->{NAME}' at $location.\n") ;
 	}
 
+$self->{MAXIMUM_RANGE_NAME_SIZE} = 4 if$self->{MAXIMUM_RANGE_NAME_SIZE} < 4 ;
+
+$self->{FIELD_LENGTH} =
+	{
+	OFFSET =>  $self->{OFFSET_FORMAT} =~ /^hex/ ? 8 : 10,
+	CUMULATIVE_OFFSET =>  $self->{OFFSET_FORMAT} =~ /^hex/ ? 8 : 10,
+	RANGE_NAME =>  $self->{MAXIMUM_RANGE_NAME_SIZE},
+	ASCII_DUMP =>  $self->{DATA_WIDTH},
+	HEX_DUMP =>  $self->{DATA_WIDTH} * 3,
+	DEC_DUMP =>  $self->{DATA_WIDTH} * 4,
+	USER_INFORMATION =>  20,
+	BITFIELD_SOURCE => 8 ,
+	} ;
+
 $self->{OFFSET_FORMAT} = $self->{OFFSET_FORMAT} =~ /^hex/ ? "%08x" : "%010d" ;
-$self->{MAXIMUM_RANGE_NAME_SIZE} = 2 if$self->{MAXIMUM_RANGE_NAME_SIZE} <= 2 ;
 
 if($self->{ORIENTATION} =~ /^hor/)
 	{
+	$self->{DISPLAY_BITFIELDS} = 0 unless defined $self->{DISPLAY_BITFIELDS} ;
+	$self->{DISPLAY_BITFIELD_SOURCE} = 0 unless $self->{DISPLAY_BITFIELDS} ;
+	
 	my @fields = qw(OFFSET) ;
 	push @fields, 'BITFIELD_SOURCE' if $self->{DISPLAY_BITFIELD_SOURCE} ;
 	push @fields, qw( HEX_DUMP DEC_DUMP ASCII_DUMP RANGE_NAME) ;
@@ -184,14 +202,38 @@ if($self->{ORIENTATION} =~ /^hor/)
 	}
 else
 	{
+	$self->{DISPLAY_BITFIELDS} = 1 unless defined $self->{DISPLAY_BITFIELDS} ;
+	
 	$self->{FIELDS_TO_DISPLAY} =  
 		 [qw(RANGE_NAME OFFSET CUMULATIVE_OFFSET HEX_DUMP DEC_DUMP ASCII_DUMP USER_INFORMATION)] ;
 	}
 
-my (undef, undef, $colorizer) = get_colorizer_data($self->{FORMAT}) ; # verify validity
-$self->{INTERACTION}{DIE}("Error: Invalid output format '$self->{FORMAT}'.\n") unless defined $colorizer ;
+#Todo: verify FORMAT and COLOR_NAMES validity
+if(! defined $self->{FORMAT} || ($self->{FORMAT} ne 'ANSI' && $self->{FORMAT} ne 'HTML' && $self->{FORMAT} ne 'ASCII'))
+	{
+	$self->{FORMAT} ||= 'undef' ;
+	$self->{INTERACTION}{DIE}("Error: Invalid output format '$self->{FORMAT}'.\n")  ;
+	}
 
-return(1) ;
+if(defined $self->{GATHERED_CHUNK} && 'CODE' ne ref($self->{GATHERED_CHUNK}))
+	{
+	$self->{INTERACTION}{DIE}("Error: GATHERED_CHUNK is not a code reference.\n")  ;
+	}
+
+if(defined $self->{START_COLOR})
+	{
+	my $index = 0 ;
+	
+	for my $color_name (@{$self->{COLORS}{$self->{FORMAT}}})
+		{
+		last if $color_name eq $self->{START_COLOR} ;
+		$index++ ;
+		}
+		
+	$self->{CURRENT_COLOR_INDEX} = $index ;
+	}
+
+return ;
 }
 
 #-------------------------------------------------------------------------------
@@ -199,7 +241,7 @@ return(1) ;
 sub CheckOptionNames
 {
 
-=head2 [P] CheckOptionNames(...)
+=head2 [P] CheckOptionNames()
 
 Verifies the named options passed to the members of this class. Calls B<{INTERACTION}{DIE}> in case
 of error. 
@@ -266,9 +308,9 @@ None so far.
 	CPAN ID: NKH
 	mailto: nadim@cpan.org
 
-=head1 COPYRIGHT & LICENSE
+=head1 COPYRIGHT AND LICENSE
 
-Copyright 2010 Nadim Khemir.
+Copyright Nadim Khemir 2010.
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of either:

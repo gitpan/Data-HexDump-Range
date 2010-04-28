@@ -1,5 +1,5 @@
 
-package Data::HexDump::Range ;
+package Data::HexDump::Range ; ## no critic (Modules::RequireFilenameMatchesPackage)
 
 use strict;
 use warnings ;
@@ -18,7 +18,6 @@ use Sub::Exporter -setup =>
 	};
 	
 use vars qw ($VERSION);
-$VERSION     = '0.01';
 }
 
 #-------------------------------------------------------------------------------
@@ -37,6 +36,12 @@ use Carp qw(carp croak confess) ;
 =head1 NAME
 
 Data::HexDump::Range::Gather - Handles gathering of binary data  for Data::HexDump::Range
+
+=head1 SYNOPSIS
+
+=head1 DESCRIPTION
+
+=head1 DOCUMENTATION
 
 =head1 SUBROUTINES/METHODS
 
@@ -88,32 +93,9 @@ I<Exceptions> dies if passed invalid parameters
 my ($self, $collected_data, $range_description, $data, $offset, $size) = @_ ;
 
 my $location = "$self->{FILE}:$self->{LINE}" ;
-my $range_provider ;
-
-if('CODE' eq ref($range_description))
-	{
-	$range_provider = $range_description ;
-	}
-else
-	{
-	my $ranges = $self->create_ranges($range_description) ;
-	
-	$range_provider = 
-		sub
-		{
-		while(@{$ranges})
-			{
-			return shift @{$ranges} ;
-			}
-		}
-	}
 
 my $used_data = $offset || 0 ;
-
-if($used_data < 0)
-	{
-	$self->{INTERACTION}{DIE}("Warning: Invalid negative offset at '$location'.\n")
-	}
+$self->{INTERACTION}{DIE}("Error: Invalid negative offset at '$location'.\n") if($used_data < 0) ;
 
 $size = defined $size ? min($size, length($data) - $used_data) : length($data) - $used_data ;
 my $maximum_size = $size ;
@@ -121,51 +103,60 @@ my $maximum_size = $size ;
 my $skip_remaining_ranges = 0 ;
 my $last_data = '' ;
 
+my $range_provider = $self->create_range_provider($range_description);
+
 while(my $range  = $range_provider->($self, $data, $used_data))
 	{
-	my ($range_name, $range_size, $range_color, $range_user_information) = @{$range} ;
-	my $range_size_definition = $range_size ; # needed for comment and bitfield
+	my ($range_name, $range_size_definition, $range_color, $range_user_information) = @{$range} ;
+	my $range_size = $range_size_definition; 
 
 	for my $range_field ($range_name, $range_size, $range_color, $range_user_information)
 		{
 		$range_field =  $range_field->($data, $used_data, $size, $range) if 'CODE' eq ref($range_field) ;
 		}
 
-	my ($is_comment, $is_bitfield, $unpack_format) ;
+	my ($is_comment, $is_bitfield, $is_skip, $unpack_format) ;
 
+	# handle maximum_size
 	if($EMPTY_STRING eq ref($range_size))
 		{
-		# first, type and range size
-		($is_comment, $is_bitfield, $range_size, undef) = $self->unpack_range_size($range_name, $range_size, $used_data) ;
-		
-		# second, adjust the so we don't extract more than the user asked for
-		if($maximum_size - $used_data < $range_size)
-			{
-			$range_size = max($maximum_size - $used_data, 0) ;
-			}
+		($is_comment, $is_bitfield, $is_skip, $range_size, undef) = $self->unpack_range_size($range_name, $range_size, $used_data) ;
 		}
 	elsif('CODE' eq ref($range_size))
 		{
-		($is_comment, $is_bitfield, $range_size, undef) = $self->unpack_range_size($range_name, $range_size->(), $used_data) ;
-		
-		if($maximum_size - $used_data < $range_size)
-			{
-			$range_size = max($maximum_size - $used_data, 0) ;
-			}
+		($is_comment, $is_bitfield, $is_skip, $range_size, undef) = $self->unpack_range_size($range_name, $range_size->(), $used_data) ;
 		}
 	else
 		{
 		$self->{INTERACTION}{DIE}("Error: size '$range_size' doesn't look like a number or a code reference in range '$range_name' at '$location'.\n")
 		}
 
+	my $truncated_size ;
+	if($maximum_size - $used_data < $range_size)
+		{
+		$range_size = $truncated_size = max($maximum_size - $used_data, 0) ;
+		$skip_remaining_ranges++ ;
+		}
 	#third, get the unpack format with the justified size
 	# note that we keep $is_comment and $is_bitfield from first run
 	# as the those are extracted from the size field and we have modified it
-	(undef, undef, $range_size, $unpack_format) = $self->unpack_range_size($range_name, $range_size, $used_data) ;
+	(undef, undef, undef, $range_size, $unpack_format) = $self->unpack_range_size($range_name, $range_size, $used_data) ;
 	
-	# display bitfields even for ranges that pass max_size (truncated ranges)
-	last if $maximum_size == $used_data && ! $is_comment && !$is_bitfield ;
-
+	if($maximum_size == $used_data)
+		{
+		if($is_comment || $is_bitfield)
+			{
+			# display bitfields even for ranges that pass maximim_size (truncated ranges)
+			}
+		else
+			{
+			my $next_range  = $range_provider->($self, $data, $used_data) ;
+			$self->{INTERACTION}{WARN}("Warning: More ranges to display but no more data.\n") if defined $next_range ;
+			
+			last ;
+			}
+		}
+		
 	if(! $is_comment && ! $is_bitfield)
 		{
 		if($range_size == 0 && $self->{DISPLAY_ZERO_SIZE_RANGE_WARNING}) 
@@ -173,24 +164,19 @@ while(my $range  = $range_provider->($self, $data, $used_data))
 			$self->{INTERACTION}{WARN}("Warning: range '$range_name' requires zero bytes.\n") ;
 			}
 			
-		if($self->{DISPLAY_RANGE_SIZE})
+		if(defined $truncated_size)
 			{
-			$range_name = $range_size . ':' . $range_name ;
+			$self->{INTERACTION}{WARN}("Warning: range '$range_name' size was reduced from $range_size_definition to $truncated_size due to size limit at '$location'.\n") ;
+			$range_name = "$range_size_definition->$truncated_size:$range_name"  ;
 			}
-		}
-
-	if($range_size > $size)
-		{
-		$self->{INTERACTION}{WARN}("Warning: not enough data for range '$range_name', $range_size needed but only $size available.\n") ;
-		
-		$range_name = '-' . ($range_size - $size)  . ':' . $range_name ;
-		
-		$range_size = $size;
-		$skip_remaining_ranges++ ;
-		}
-		
-	unless ($is_comment || $is_bitfield)
-		{
+		else
+			{
+			if($self->{DISPLAY_RANGE_SIZE})
+				{
+				$range_name = "$range_size:$range_name" ;
+				}
+			}
+			
 		$last_data = unpack($unpack_format, $data) # get out data from the previous range for bitfield
 		}
 		
@@ -201,8 +187,22 @@ while(my $range  = $range_provider->($self, $data, $used_data))
 		OFFSET => $used_data,
 		DATA =>  $is_comment ? undef : $last_data,
 		IS_BITFIELD => $is_bitfield ? $range_size_definition : 0,
+		IS_SKIP => $is_skip,
+		IS_COMMENT => $is_comment,
 		USER_INFORMATION => $range_user_information,
 		} ;
+	
+	if(defined $self->{GATHERED_CHUNK})
+		{
+		my @chunks = $self->{GATHERED_CHUNK}($self, $chunk) ;
+		push @{$collected_data}, @chunks ;	
+		}
+	else
+		{
+		push @{$collected_data}, $chunk ;	
+		}
+	
+	# todo dump the stuff that the gathered callback returned
 	
 	if($self->{DUMP_RANGE_DESCRIPTION})
 		{
@@ -218,15 +218,107 @@ while(my $range  = $range_provider->($self, $data, $used_data))
 				) ;
 		}
 
-	push @{$collected_data}, $chunk ;	
-	
 	$used_data += $range_size ;
 	$size -= $range_size ;
-	
+
 	last if $skip_remaining_ranges ;
 	}
-
+	
 return $collected_data, $used_data ;
+}
+
+#-------------------------------------------------------------------------------
+
+sub create_range_provider
+{
+
+=head2 [P] create_range_provider($range_description)
+
+Transforms the user supplied ranges into an internal format
+
+I<Arguments> - 
+
+=over 2 
+
+=item * $range_description - An array reference or a subroutine reference
+
+=back
+
+I<Returns> - Array ference - ranges in internal format
+
+I<Exceptions> - None
+
+=cut
+
+my ($self, $range_description) = @_ ;
+
+my $range_provider ;
+
+if('CODE' eq ref($range_description))
+	{
+	my $ranges ;
+	
+	$range_provider = 
+		sub
+		{
+		my ($dumper, $data, $offset) = @_ ;
+		
+		if(! defined $ranges || ! @{$ranges})
+			{
+			my $generated_range_description = $range_description->($dumper, $data, $offset) ;
+			
+			return undef unless defined $generated_range_description ;
+			
+			my $created_ranges = $self->create_ranges($generated_range_description) ;
+			
+			push @{$ranges}, @{$created_ranges}, $range_description ;
+			}
+		
+	RANGE:
+		my $local_description = shift@{$ranges} ;
+		
+		if('CODE' eq  ref $local_description)
+			{
+			my $sub_range_description = $local_description->($dumper, $data, $offset) ; 
+			
+			if(defined $sub_range_description)
+				{
+				unshift @{$ranges}, $local_description ;
+				
+				if('CODE' eq  ref $sub_range_description )
+					{
+					unshift @{$ranges}, $sub_range_description ;
+					}
+				else
+					{
+					my $created_ranges = $self->create_ranges($sub_range_description) ; 
+					unshift @{$ranges}, @{$created_ranges} ;
+					}
+				}
+			#else
+				# sub generating ranges is done
+				
+			goto RANGE ;
+			}
+		
+		return $local_description ;
+		}
+	}
+else
+	{
+	my $ranges = $self->create_ranges($range_description) ;
+	
+	$range_provider = 
+		sub
+		{
+		while(@{$ranges})
+			{
+			return shift @{$ranges} ;
+			}
+		}
+	}
+
+return $range_provider ;
 }
 
 #-------------------------------------------------------------------------------
@@ -265,13 +357,14 @@ I<Returns> - A list
 =item * $unpack_format -  A String - formated according to I<pack>.
 
 =back
+
 I<Exceptions> - Croaks with an error messge if the input data is invalid
 
 =cut
 
 my ($self, $range_name, $size, $used_data) = @_ ;
 
-my ($is_comment, $is_bitfield, $range_size, $unpack_format) = (0, 0, -1, '');
+my ($is_comment, $is_bitfield, $is_skip, $range_size, $unpack_format) = (0, 0, 0, -1, '');
 
 if('#' eq  $size)
 	{
@@ -283,6 +376,12 @@ elsif($size =~ '^\s*(x\d*)?\s*b\d*\s*$')
 	{
 	$is_bitfield++ ;
 	$range_size = 0 ;
+	$unpack_format = '#' ;
+	}
+elsif($size =~ '^\s*x(\d+)\s*$')
+	{
+	$is_skip++ ;
+	$range_size = $1 ;
 	$unpack_format = '#' ;
 	}
 elsif(looks_like_number($size))
@@ -297,7 +396,7 @@ else
 	$self->{INTERACTION}{DIE}("Error: size '$size' doesn't look valid in range '$range_name' at '$location'.\n")
 	}
 
-return ($is_comment, $is_bitfield, $range_size, $unpack_format) ;
+return ($is_comment, $is_bitfield, $is_skip, $range_size, $unpack_format) ;
 }
 
 #-------------------------------------------------------------------------------
@@ -317,7 +416,7 @@ I<Arguments> -
 
 =back
 
-I<Returns> - Nothing
+I<Returns> - Array ference - ranges in internal format
 
 I<Exceptions> - Croaks with an error messge if the input data is invalid
 
@@ -347,7 +446,7 @@ I<Arguments> -
 
 =back
 
-I<Returns> - Nothing
+I<Returns> - Array ference - ranges in internal format
 
 I<Exceptions> - Croaks with an error messge if the input data is invalid
 
@@ -390,7 +489,7 @@ I<Arguments> -
 
 =back
 
-I<Returns> - Nothing
+I<Returns> - I<Returns> - Array ference - ranges in internal format
 
 I<Exceptions> - Croaks with an error messge if the input data is invalid
 
@@ -486,12 +585,12 @@ map
 				{
 				push @{$description}, undef ;
 				# make sure we get a default color
-				$description->[2] = undef if $description->[2] eq $EMPTY_STRING ;
+				$description->[2] = undef if defined $description->[2] && $description->[2] eq $EMPTY_STRING ;
 				}
 			elsif(@{$description} == 4)
 				{
 				# make sure we get a default color
-				$description->[2] = undef if $description->[2] eq $EMPTY_STRING ;
+				$description->[2] = undef if defined $description->[2] && $description->[2] eq $EMPTY_STRING ;
 				}
 			elsif(@{$description} > $RANGE_DEFINITON_FIELDS)
 				{
@@ -531,9 +630,9 @@ None so far.
 	CPAN ID: NKH
 	mailto: nadim@cpan.org
 
-=head1 COPYRIGHT & LICENSE
+=head1 COPYRIGHT AND LICENSE
 
-Copyright 2010 Nadim Khemir.
+Copyright Nadim Khemir 2010.
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of either:

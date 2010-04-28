@@ -1,4 +1,95 @@
-commit 199a4b127b29f91d2e63f95f8c40bde19ba138c4 (HEAD, master)
+commit 503c597d4af1d4dd4aa9e62f527d90c46a4c7842 (HEAD, master)
+Author: nadim khemir <nkh@cpan.org>
+Date:   Wed Apr 28 09:34:15 2010 +0200
+
+    ADDED: GATHERED_CHUNK callback
+
+commit fd2a407abd94f472ba80c6da1becc5dc10f5ba46
+Author: nadim khemir <nkh@cpan.org>
+Date:   Tue Apr 27 23:31:03 2010 +0200
+
+    CHANGED: object keeps track of gathered ranges even when "dump" is called
+
+commit 7be6471ef95e3a5483cad112d1221425b6372402
+Author: nadim khemir <nkh@cpan.org>
+Date:   Tue Apr 27 22:54:33 2010 +0200
+
+    CHANGED: refactoring to pass perl critics
+
+commit de758c7e2c16bed2054c450e07655d457208a953
+Author: nadim khemir <nkh@cpan.org>
+Date:   Mon Apr 26 00:34:49 2010 +0200
+
+    CHANGED: some refactoring
+
+commit 836bf0074092420c1c3cad2f1ed31424011870e0
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sat Apr 24 14:46:30 2010 +0200
+
+    CHANGED: hdr examples to reflect bit zero is on the right by default
+
+commit 856bea788654642bc7e1940b987f6a908d35b827
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sat Apr 24 14:36:21 2010 +0200
+
+    CHANGED: module documentation to reflect bit zero is on the right by default
+
+commit 6695c62034eb1e683dbb0409e2e942e26c35c1b1
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sat Apr 24 14:20:33 2010 +0200
+
+    CHANGED: bitfield bit zero is on the right by default
+
+commit be364a188931e8af16f87a515cb2a40b688e4575
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sat Apr 24 12:22:02 2010 +0200
+
+    FIXED: colorizer does not handle '<'
+    FIXED: column width computation
+    ADDED: option to add the command line into the output
+    ADDED: option --color_start
+    ADDED: options --start_tag and --end_tag
+    ADDED: option --offset_start
+    ADDED: completed hdr examples
+    CHANGED: use warn instead for carp in hdr command
+
+commit dca055ebfe4bc048cd5b52c490a9b00dbf12137a
+Author: nadim khemir <nkh@cpan.org>
+Date:   Fri Apr 23 23:16:48 2010 +0200
+
+    ADDED: entries in hdr examples
+    FIXED: size warnings in the right order
+    CHANGED: default colors to bright_ colors
+    FIXED: BITFIELDS_SOURCE was displayed even if not bitfields where to be displayed
+    FIXED: information color in HTML format
+
+commit 881775d5b8b5eb51f93ab085ad82774737a02888
+Author: nadim khemir <nkh@cpan.org>
+Date:   Thu Apr 22 15:11:59 2010 +0200
+
+    CHANGED: Colorize through Text::Colorizer
+    ADDED: hdr accept a color file definition
+    ADDED: skip ranges
+
+commit d01109fce598f2e091fe41210ed1267c9f6a0208
+Author: nadim khemir <nkh@cpan.org>
+Date:   Wed Apr 21 21:57:18 2010 +0200
+
+    ADDED: Warn about range truncation due to --maximum_size
+    ADDED: truncated ranges have <T> prepended to their name
+    ADDED: Handle mixed sub and data in the range description
+    FIXED: random color index part of the object
+    CHANGED: Horizontal display do no show bitfields per default
+
+commit 44065d57ae54bf72e98aea9b34b27ee9dfaa0647
+Author: nadim khemir <nkh@cpan.org>
+Date:   Wed Apr 21 00:34:34 2010 +0200
+
+    ADDED: range description defined by a sub can return complex range
+    definition
+    ADDED: warn if more ranges exist but there is no more data
+
+commit 199a4b127b29f91d2e63f95f8c40bde19ba138c4
 Author: nadim khemir <nkh@cpan.org>
 Date:   Tue Apr 20 01:06:03 2010 +0200
 
