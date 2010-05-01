@@ -1,4 +1,38 @@
-commit 503c597d4af1d4dd4aa9e62f527d90c46a4c7842 (HEAD, master)
+commit b9ce070dbee8ae80cc1fe3dee292e772a3c971da (HEAD, master)
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sat May 1 21:15:12 2010 +0200
+
+    ADDED: IPV4 example in documentation
+
+commit 17a141617198581d6c7153ec52f94bcced90ad87
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sat May 1 16:09:22 2010 +0200
+
+    ADDED: DISPLAY_COMMENT_RANGE
+
+commit 78b3de0d0576b8affb597d064e35347376a9aa3f
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sat May 1 11:33:37 2010 +0200
+
+    FIXED: in horizontal mode, all bf have the same color
+    FIXED: in horizontal mode, bitfield display was delayed
+
+commit f6292c060103f54a7a83b9bda9334bdb23e51a97
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sat May 1 10:54:01 2010 +0200
+
+    ADDED: documented single sub range description arguments
+    ADDED: Better  message if the range descriptionpars is perl and contains errors
+    ADDED: IPV4 header parser example
+
+commit 16e8379897588766583bd9206ca95afcb84e0c95
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sat May 1 09:40:09 2010 +0200
+
+    CHANGED: single sub range definition are called at gather time and can choose to not return a range
+    ADDED: MAXIMUM_USER_INFORMATION_SIZE
+
+commit 503c597d4af1d4dd4aa9e62f527d90c46a4c7842
 Author: nadim khemir <nkh@cpan.org>
 Date:   Wed Apr 28 09:34:15 2010 +0200
 

@@ -50,12 +50,13 @@ Subroutines prefixed with B<[P]> are not part of the public API and shall not be
 
 #-------------------------------------------------------------------------------
 
-Readonly my $NEW_ARGUMENTS => 	
+Readonly my $NEW_ARGUMENTS => 
 	[
 	qw(
 	NAME INTERACTION VERBOSE
 	
 	DUMP_RANGE_DESCRIPTION
+	DUMP_ORIGINAL_RANGE_DESCRIPTION
 	GATHERED_CHUNK
 	
 	FORMAT 
@@ -70,15 +71,23 @@ Readonly my $NEW_ARGUMENTS =>
 	DISPLAY_CUMULATIVE_OFFSET
 	DISPLAY_ZERO_SIZE_RANGE_WARNING
 	DISPLAY_ZERO_SIZE_RANGE 
+	DISPLAY_COMMENT_RANGE
+	
 	DISPLAY_RANGE_NAME
 	MAXIMUM_RANGE_NAME_SIZE
 	DISPLAY_RANGE_SIZE
+	
 	DISPLAY_ASCII_DUMP
 	DISPLAY_HEX_DUMP
 	DISPLAY_DEC_DUMP
+	
 	DISPLAY_USER_INFORMATION
+	MAXIMUM_USER_INFORMATION_SIZE
+	
 	DISPLAY_BITFIELDS
 	DISPLAY_BITFIELD_SOURCE
+	MAXIMUM_BITFIELD_SOURCE_SIZE
+	
 	BIT_ZERO_ON_LEFT
 	COLOR_NAMES 
 	ORIENTATION 
@@ -117,6 +126,7 @@ $self->CheckOptionNames($NEW_ARGUMENTS, @setup_data) ;
 	
 	VERBOSE => 0,
 	DUMP_RANGE_DESCRIPTION => 0,
+	DUMP_ORIGINAL_RANGE_DESCRIPTION => 0,
 	
 	FORMAT => 'ANSI',
 	
@@ -126,8 +136,8 @@ $self->CheckOptionNames($NEW_ARGUMENTS, @setup_data) ;
 	COLORS =>
 		{
 		ASCII => [],
-		ANSI => ['bright_green', 'bright_yellow','bright_cyan', 'bright_red', 'bright_white'],
-		HTML => ['bright_green', 'bright_yellow','bright_cyan', 'bright_red', 'bright_white' ],
+		ANSI => ['bright_green', 'bright_yellow','bright_cyan', 'bright_red', 'bright_white', 'bright_yellow','bright_red', 'bright_white', 'bright_cyan', ],
+		HTML => ['bright_green', 'bright_yellow','bright_cyan', 'bright_red', 'bright_white', 'bright_yellow','bright_red', 'bright_white', 'bright_cyan', ],
 		},
 		
 	OFFSET_FORMAT => 'hex',
@@ -137,6 +147,7 @@ $self->CheckOptionNames($NEW_ARGUMENTS, @setup_data) ;
 	
 	DISPLAY_ZERO_SIZE_RANGE_WARNING => 1,
 	DISPLAY_ZERO_SIZE_RANGE => 1,
+	DISPLAY_COMMENT_RANGE => 1,
 	
 	DISPLAY_RANGE_NAME => 1,
 	MAXIMUM_RANGE_NAME_SIZE => 16,
@@ -151,9 +162,11 @@ $self->CheckOptionNames($NEW_ARGUMENTS, @setup_data) ;
 	DISPLAY_DEC_DUMP => 0,
 	DISPLAY_ASCII_DUMP => 1,
 	DISPLAY_USER_INFORMATION => 0,
+	MAXIMUM_USER_INFORMATION_SIZE => 20,
 
 	DISPLAY_BITFIELDS => undef,
 	DISPLAY_BITFIELD_SOURCE => 1,
+	MAXIMUM_BITFIELD_SOURCE_SIZE => 8,
 	BIT_ZERO_ON_LEFT => 0,
 	
 	ORIENTATION => 'horizontal',

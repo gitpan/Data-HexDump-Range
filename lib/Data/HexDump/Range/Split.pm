@@ -81,6 +81,7 @@ my $total_dumped_data = 0 ;
 my $room_left = $self->{DATA_WIDTH} ;
 
 my $max_range_name_size = $self->{MAXIMUM_RANGE_NAME_SIZE} ;
+my $user_information_size = $self->{MAXIMUM_USER_INFORMATION_SIZE} ;
 my $range_source = ['?', 'white'] ;
 
 my @found_bitfields ;
@@ -96,13 +97,20 @@ for my $range (@{$collected_data})
 		
 	if($self->{ORIENTATION} =~ /^hor/)
 		{
+		$range->{COLOR} = $self->get_default_color()  unless defined $range->{COLOR} ;
+		
 		if($range->{IS_BITFIELD}) 
 			{
 			push @found_bitfields, $self->get_bitfield_lines($range) ;
+			
 			next ;
 			}
-			
-		$range->{COLOR} = $self->get_default_color()  unless defined $range->{COLOR} ;
+		
+		if($room_left == $self->{DATA_WIDTH})
+			{
+			push @lines,  @found_bitfields ;
+			@found_bitfields = () ;
+			}
 		
 		# remember what range we process in case next range is bitfield
 		unless($range->{IS_COMMENT})
@@ -113,22 +121,36 @@ for my $range (@{$collected_data})
 		my $dumped_data = 0 ;
 		my $data_length = defined $range->{DATA} ? length($range->{DATA}) : 0 ;
 		
-		if(0 == $data_length && $self->{DISPLAY_ZERO_SIZE_RANGE} && $self->{DISPLAY_RANGE_NAME})
+		if(0 == $data_length && $self->{DISPLAY_RANGE_NAME})
 			{
-			my $name_size_quoted = $max_range_name_size - 2 ;
-			$name_size_quoted =  2 if $name_size_quoted < 2 ;
+			my $display_range_name = 0 ;
 			
-			push @{$line->{RANGE_NAME}},
+			if($range->{IS_COMMENT})
 				{
-				'RANGE_NAME' => $start_quote . sprintf("%.${name_size_quoted}s", $range->{NAME}) . $end_quote,
-				'RANGE_NAME_COLOR' => $range->{COLOR},
-				},
+				$display_range_name++ if $self->{DISPLAY_COMMENT_RANGE} ;
+				}
+			else
 				{
-				'RANGE_NAME_COLOR' => undef,
-				'RANGE_NAME' => ', ',
-				} ;
+				$display_range_name++ if $self->{DISPLAY_ZERO_SIZE_RANGE} ;
+				}
+					
+			if($display_range_name)
+				{
+				my $name_size_quoted = $max_range_name_size - 2 ;
+				$name_size_quoted =  2 if $name_size_quoted < 2 ;
+				
+				push @{$line->{RANGE_NAME}},
+					{
+					'RANGE_NAME' => $start_quote . sprintf("%.${name_size_quoted}s", $range->{NAME}) . $end_quote,
+					'RANGE_NAME_COLOR' => $range->{COLOR},
+					},
+					{
+					'RANGE_NAME_COLOR' => undef,
+					'RANGE_NAME' => ', ',
+					} ;
+				}
 			}
-		
+			
 		if($range->{IS_SKIP}) 
 			{
 			# skip range don't display any data
@@ -244,17 +266,31 @@ for my $range (@{$collected_data})
 		my $dumped_data = 0 ;
 		my $current_range = '' ;
 		
-		if(!$range->{IS_BITFIELD} && 0 == $data_length && $self->{DISPLAY_ZERO_SIZE_RANGE} && $self->{DISPLAY_RANGE_NAME})
+		if(!$range->{IS_BITFIELD} && 0 == $data_length && $self->{DISPLAY_RANGE_NAME}) # && $self->{DISPLAY_RANGE_NAME})
 			{
-			push @{$line->{RANGE_NAME}},
+			my $display_range_name = 0 ;
+			
+			if($range->{IS_COMMENT})
 				{
-				'RANGE_NAME_COLOR' => $range->{COLOR},
-				'RANGE_NAME' => "$start_quote$range->{NAME}$end_quote",
-				} ;
-				
-			$line->{NEW_LINE} ++ ;
-			push @lines, $line ;
-			$line = {};
+				$display_range_name++ if $self->{DISPLAY_COMMENT_RANGE} ;
+				}
+			else
+				{
+				$display_range_name++ if $self->{DISPLAY_ZERO_SIZE_RANGE} ;
+				}
+					
+			if($display_range_name)
+				{
+				push @{$line->{RANGE_NAME}},
+					{
+					'RANGE_NAME_COLOR' => $range->{COLOR},
+					'RANGE_NAME' => "$start_quote$range->{NAME}$end_quote",
+					} ;
+					
+				$line->{NEW_LINE} ++ ;
+				push @lines, $line ;
+				$line = {};
+				}
 			}
 			
 		if($range->{IS_SKIP}) 
@@ -337,7 +373,7 @@ for my $range (@{$collected_data})
 				['HEX_DUMP', sub {sprintf '%02x ' x $size_to_dump, @{$_[0]}}, $range->{COLOR}, 3 * $self->{DATA_WIDTH}],
 				['DEC_DUMP', sub {sprintf '%03u ' x $size_to_dump, @{ $_[0] }}, $range->{COLOR}, 4 * $self->{DATA_WIDTH}],
 				['ASCII_DUMP', sub {sprintf '%c' x $size_to_dump, map{$_ < 30 ? ord('.') : $_ } @{$_[0]}}, $range->{COLOR}, $self->{DATA_WIDTH}],
-                                ['USER_INFORMATION', sub { sprintf '%-20.20s', $range->{USER_INFORMATION} || ''}, $range->{COLOR}, 20],
+                                ['USER_INFORMATION', sub { sprintf "%-${user_information_size}.${user_information_size}s", $range->{USER_INFORMATION} || ''}, $range->{COLOR}, $user_information_size],
 				)
 				{
 				my ($field_name, $field_data_formater, $color, $field_text_size) = @{$field_type} ;
@@ -421,6 +457,7 @@ $offset ||= 0 ;
 $size ||= 1 ;
 
 my $max_range_name_size = $self->{MAXIMUM_RANGE_NAME_SIZE} ;
+my $max_bitfield_source_size = $self->{MAXIMUM_BITFIELD_SOURCE_SIZE} ;
 
 my %always_display_field = map {$_ => 1} qw(RANGE_NAME OFFSET CUMULATIVE_OFFSET BITFIELD_SOURCE USER_INFORMATION) ;
 
@@ -431,7 +468,7 @@ for my  $field_type
 	['RANGE_NAME',  sub {sprintf "%-${max_range_name_size}.${max_range_name_size}s", '.' . $_[0]->{NAME} ; }, undef, $max_range_name_size ] ,
 	['OFFSET', sub {sprintf '%02u .. %02u', $offset, ($offset + $size) - 1}, undef, 8],
 	['CUMULATIVE_OFFSET', sub {''}, undef, 8],
-	['BITFIELD_SOURCE', sub {sprintf '%-8.8s', $_[0]->{SOURCE}[0]}, $bitfield_description->{SOURCE}[1], 8],
+	['BITFIELD_SOURCE', sub {sprintf "%-${max_bitfield_source_size}.${max_bitfield_source_size}s", $_[0]->{SOURCE}[0]}, $bitfield_description->{SOURCE}[1], 8],
 	['HEX_DUMP', 
 		sub 
 		{
