@@ -1,4 +1,22 @@
-commit b9ce070dbee8ae80cc1fe3dee292e772a3c971da (HEAD, master)
+commit b25d7e4df452fd243cc2213a7054beee7c794a16 (HEAD, master)
+Author: nadim khemir <nkh@cpan.org>
+Date:   Tue May 4 11:39:53 2010 +0200
+
+    ADDED: whole byte offset to bitfields
+
+commit a2802708467b2b5957423baae59ce94094d16819
+Author: nadim khemir <nkh@cpan.org>
+Date:   Tue May 4 10:42:16 2010 +0200
+
+    CHANGED: comment as sub example
+
+commit b14b9cd308cdbedfba3fb376e18f3b2e18afa487
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sun May 2 10:38:46 2010 +0200
+
+    ADDED: better DUMP_[ORIGINAL_]RANGE_DESCRIPTION description
+
+commit b9ce070dbee8ae80cc1fe3dee292e772a3c971da
 Author: nadim khemir <nkh@cpan.org>
 Date:   Sat May 1 21:15:12 2010 +0200
 
