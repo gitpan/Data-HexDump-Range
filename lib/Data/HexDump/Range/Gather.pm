@@ -162,16 +162,16 @@ while(my $range  = $range_provider->($self, $data, $used_data))
 		$range_field =  $range_field->($self, $data, $used_data, $size, $range) if 'CODE' eq ref($range_field) ;
 		}
 
-	my ($is_comment, $is_bitfield, $is_skip, $unpack_format) ;
+	my ($is_header, $is_comment, $is_bitfield, $is_skip, $unpack_format) ;
 
 	# handle maximum_size
 	if($EMPTY_STRING eq ref($range_size))
 		{
-		($is_comment, $is_bitfield, $is_skip, $range_size, undef) = $self->unpack_range_size($range_name, $range_size, $used_data) ;
+		($is_header, $is_comment, $is_bitfield, $is_skip, $range_size, undef) = $self->unpack_range_size($range_name, $range_size, $used_data) ;
 		}
 	elsif('CODE' eq ref($range_size))
 		{
-		($is_comment, $is_bitfield, $is_skip, $range_size, undef) = $self->unpack_range_size($range_name, $range_size->(), $used_data) ;
+		($is_header, $is_comment, $is_bitfield, $is_skip, $range_size, undef) = $self->unpack_range_size($range_name, $range_size->(), $used_data) ;
 		}
 	else
 		{
@@ -184,14 +184,14 @@ while(my $range  = $range_provider->($self, $data, $used_data))
 		$range_size = $truncated_size = max($maximum_size - $used_data, 0) ;
 		$skip_remaining_ranges++ ;
 		}
-	#third, get the unpack format with the justified size
+	# get the unpack format with the justified size
 	# note that we keep $is_comment and $is_bitfield from first run
 	# as the those are extracted from the size field and we have modified it
-	(undef, undef, undef, $range_size, $unpack_format) = $self->unpack_range_size($range_name, $range_size, $used_data) ;
+	(undef,undef, undef, undef, $range_size, $unpack_format) = $self->unpack_range_size($range_name, $range_size, $used_data) ;
 	
 	if($maximum_size == $used_data)
 		{
-		if($is_comment || $is_bitfield)
+		if($is_header || $is_comment || $is_bitfield)
 			{
 			# display bitfields even for ranges that pass maximim_size (truncated ranges)
 			}
@@ -204,7 +204,7 @@ while(my $range  = $range_provider->($self, $data, $used_data))
 			}
 		}
 		
-	if(! $is_comment && ! $is_bitfield)
+	if(!$is_header && ! $is_comment && ! $is_bitfield)
 		{
 		if($range_size == 0 && $self->{DISPLAY_ZERO_SIZE_RANGE_WARNING}) 
 			{
@@ -234,6 +234,7 @@ while(my $range  = $range_provider->($self, $data, $used_data))
 		OFFSET => $used_data,
 		DATA =>  $is_comment ? undef : $last_data,
 		IS_BITFIELD => $is_bitfield ? $range_size_definition : 0,
+		IS_HEADER => $is_header,
 		IS_SKIP => $is_skip,
 		IS_COMMENT => $is_comment,
 		USER_INFORMATION => $range_user_information,
@@ -248,8 +249,6 @@ while(my $range  = $range_provider->($self, $data, $used_data))
 		{
 		push @{$collected_data}, $chunk ;	
 		}
-	
-	# todo dump the stuff that the gathered callback returned
 	
 	if($self->{DUMP_RANGE_DESCRIPTION})
 		{
@@ -291,7 +290,7 @@ I<Arguments> -
 
 =back
 
-I<Returns> - Array ference - ranges in internal format
+I<Returns> - Array reference - ranges in internal format
 
 I<Exceptions> - None
 
@@ -395,6 +394,8 @@ I<Returns> - A list
 
 =over 2 
 
+=item * $is_header - Boolean -
+
 =item * $is_comment - Boolean -
 
 =item * $is_bitfield - Boolean -
@@ -411,7 +412,9 @@ I<Exceptions> - Croaks with an error messge if the input data is invalid
 
 my ($self, $range_name, $size, $used_data) = @_ ;
 
-my ($is_comment, $is_bitfield, $is_skip, $range_size, $unpack_format) = (0, 0, 0, -1, '');
+my ($is_header, $is_comment, $is_bitfield, $is_skip, $range_size, $unpack_format) = (0, 0, 0, 0, -1, '');
+
+my $digits_or_hex = '(?:(?:0x[0-9a-fA-F]+)|(?:\d+))' ;
 
 if('#' eq  $size)
 	{
@@ -419,22 +422,32 @@ if('#' eq  $size)
 	$range_size = 0 ;
 	$unpack_format = '#' ;
 	}
-elsif($size =~ '^\s*(X\d*)?(x\d*)?\s*b\d*\s*$')
+elsif('@' eq  $size)
+	{
+	$is_header++ ;
+	$range_size = 0 ;
+	$unpack_format = '#' ;
+	}
+elsif($size =~ /^\s*(X$digits_or_hex)?\s*(x$digits_or_hex)?\s*b$digits_or_hex\s*$/)
 	{
 	$is_bitfield++ ;
 	$range_size = 0 ;
 	$unpack_format = '#' ;
 	}
-elsif($size =~ '^\s*x|X(\d+)\s*$')
+elsif($size =~ /^\s*(x|X)($digits_or_hex)\s*$/)
 	{
 	$is_skip++ ;
-	$range_size = $1 ;
+	$range_size = $2 ;
+	
+	$range_size = hex($range_size) if  $range_size =~ /^0x/ ;
 	$unpack_format = '#' ;
 	}
-elsif(looks_like_number($size))
+elsif($size =~ /^\s*($digits_or_hex)\s*$/)
 	{
-	$unpack_format = "x$used_data a$size"  ;
-	$range_size = $size ;
+	$range_size = $1 ;
+	$range_size = hex($range_size) if  $range_size =~ /^0x/ ;
+	
+	$unpack_format = "x$used_data a$range_size"  ;
 	}
 else
 	{
@@ -443,7 +456,9 @@ else
 	$self->{INTERACTION}{DIE}("Error: size '$size' doesn't look valid in range '$range_name' at '$location'.\n")
 	}
 
-return ($is_comment, $is_bitfield, $is_skip, $range_size, $unpack_format) ;
+#~ print "$range_name => $is_header, $is_comment, $is_bitfield, $is_skip, $range_size, $unpack_format\n";
+
+return ($is_header, $is_comment, $is_bitfield, $is_skip, $range_size, $unpack_format) ;
 }
 
 #-------------------------------------------------------------------------------
@@ -506,10 +521,26 @@ my ($self, $range_description) = @_ ;
 my @ranges = 
 	map
 	{
-		[ map {s/^\s+// ; s/\s+$//; $_} split /,/ ] ;
+		'' eq $_
+			? []
+			: [ map {s/^\s+// ; s/\s+$//; $_} split /,/ ] ;
 	} split /:/, $range_description ;
 
-my @flattened = $self->flatten(\@ranges) ;
+my @flattened ;
+
+eval
+	{
+	@flattened = $self->flatten(\@ranges) ;
+	} ;
+
+if($EVAL_ERROR)
+	{
+	chomp $EVAL_ERROR ;
+
+	use Data::TreeDumper ;
+	$self->{INTERACTION}{DIE}->(DumpTree \@ranges, $EVAL_ERROR) ;
+	}
+
 @ranges = () ;
 
 while(@flattened)
@@ -544,7 +575,20 @@ I<Exceptions> - Croaks with an error messge if the input data is invalid
 
 my ($self, $range_description) = @_ ;
 
-my @flattened = $self->flatten($range_description) ;
+my @flattened ;
+
+eval
+        {
+        @flattened = $self->flatten($range_description) ;
+        } ;
+
+if($EVAL_ERROR)
+        {
+	chomp $EVAL_ERROR ;
+
+        use Data::TreeDumper ;
+        $self->{INTERACTION}{DIE}->(DumpTree $range_description, $EVAL_ERROR) ;
+        }
 
 my @ranges ;
 
@@ -580,6 +624,7 @@ I<Exceptions> - Croaks with an error messge if the input data is invalid
 =cut
 
 my $self = shift ;
+my $location = "$self->{FILE}:$self->{LINE}" ;
 
 map 
 	{
@@ -587,17 +632,18 @@ map
 	
 	if(ref($description) eq 'ARRAY')
 		{
+		if(@{$description} == 0)
+			{
+			$self->{INTERACTION}{DIE}->("Error: no elements in range description at '$location'.") ;
+			}
+			
 		if(all {'' eq ref($_) || 'CODE' eq ref($_) } @{$description} )
 			{
-			my $location = "$self->{FILE}:$self->{LINE}" ;
-			
 			if(@{$description} == 0)
 				{
 				$self->{INTERACTION}{DIE}->
 					(
-					"Error: too few elements in range description [" 
-					. join(', ', map {defined $_ ? $_ : 'undef'} @{$description})  
-					. "] at '$location'." 
+					"Error: no elements in range description at '$location'." 
 					) ;
 				}
 			elsif(@{$description} == 1)
@@ -613,7 +659,7 @@ map
 					}
 				else
 					{
-					# OK, will be called at gahter time
+					# OK, will be called at gather time
 					push @{$description}, undef, undef, undef ;
 					}
 				}

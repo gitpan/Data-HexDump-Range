@@ -1,5 +1,5 @@
-Range
-=====
+Data::HexDump::Range
+====================
 
 'Hexadecial Range Dumper'  with color, bitfields and skip ranges
 

@@ -1,4 +1,60 @@
-commit b25d7e4df452fd243cc2213a7054beee7c794a16 (HEAD, master)
+commit fff348dbd89679e5442d5e3d15a47abb9c15572e (HEAD, master)
+Author: nadim khemir <nadim@khemir.net>
+Date:   Tue May 24 01:56:45 2011 +0200
+
+    ADDED: range definition can be defined with decimal or hexadecimal numbers
+
+commit e703fc6a7a38a2896ede578b5c74879c9160cb3a
+Author: nadim khemir <nadim@khemir.net>
+Date:   Mon May 23 23:56:10 2011 +0200
+
+    CHANGED: Updated documentation
+
+commit d6f37ec39526e3513536254c9500ec711c4f402d
+Author: nadim khemir <nadim@khemir.net>
+Date:   Mon May 23 21:37:08 2011 +0200
+
+    CHANGED: redefined color and set default bw color to bright white
+
+commit e54e649b1887d635b85f90ea8048935aa1d3d141
+Author: nadim khemir <nadim@khemir.net>
+Date:   Mon May 23 21:19:30 2011 +0200
+
+    FIXED: bitfield not displayed
+    
+    FIXED: skipp range accepts x or X
+
+commit 926226f0aea5d36543e982ab34a27db3bfc569d2
+Author: nadim khemir <nadim@khemir.net>
+Date:   Mon May 23 20:05:11 2011 +0200
+
+    CHANGED: Align data in dump when skipping ranges
+
+commit 79cf9bc432e6369b870b549d979572b342b5020e
+Author: nadim khemir <nadim@khemir.net>
+Date:   Mon May 23 11:14:56 2011 +0200
+
+    FIXED: wrong offset when displaying skip field #68390
+
+commit b54ea11229ba808681f0014cffc81f0af9a3231d
+Author: nadim khemir <nadim@khemir.net>
+Date:   Mon May 23 10:44:58 2011 +0200
+
+    ADDED: header range type
+
+commit 0b09a7a53aa8df86e8161b7b1ba02671defa3b10
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sun Aug 22 00:09:51 2010 +0200
+
+    CHANGED: better bitfield error messages
+
+commit 1a44797303b72ae26b8e3401d0ade16dccf28c3d
+Author: nadim khemir <nkh@cpan.org>
+Date:   Sat Aug 21 23:27:29 2010 +0200
+
+    CHANGED: bitfield error message. RT #60545
+
+commit b25d7e4df452fd243cc2213a7054beee7c794a16
 Author: nadim khemir <nkh@cpan.org>
 Date:   Tue May 4 11:39:53 2010 +0200
 
