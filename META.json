@@ -45,7 +45,7 @@
    "provides" : {
       "Data::HexDump::Range" : {
          "file" : "lib/Data/HexDump/Range.pm",
-         "version" : "0.12"
+         "version" : "0.13"
       }
    },
    "release_status" : "stable",
@@ -54,5 +54,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "v0.12.57"
+   "version" : "v0.13.59"
 }

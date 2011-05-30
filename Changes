@@ -1,4 +1,19 @@
-commit fff348dbd89679e5442d5e3d15a47abb9c15572e (HEAD, master)
+commit 8138ed3bf54de0a4d2a379a380bb1a5fe0d2bb66 (HEAD, master)
+Author: nadim khemir <nadim@khemir.net>
+Date:   Mon May 30 15:46:03 2011 +0200
+
+    ADDED: accept hexadecimal values in hdr options
+    
+    FIXED: ascii headers use hex in hex mode
+    FIXED: documented use of hexadecimal values in range descriptions
+
+commit 3319db918be8a42ba628c1d7f22d0c73d1a91277 (offset_start)
+Author: nadim khemir <nadim@khemir.net>
+Date:   Mon May 30 13:09:28 2011 +0200
+
+    CHANGED: --offset_start aligned on boundary
+
+commit fff348dbd89679e5442d5e3d15a47abb9c15572e
 Author: nadim khemir <nadim@khemir.net>
 Date:   Tue May 24 01:56:45 2011 +0200
 
